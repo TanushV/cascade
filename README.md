@@ -185,9 +185,9 @@ The first `npm install` verifies and materializes the source archive when needed
 
 ## Validation
 
-The exact source archive committed here passed locally:
+The verified base source archive plus its reviewable cross-platform overlays passed locally:
 
-- **44 automated tests, 0 failures**;
+- **45 automated tests, 0 failures**;
 - static syntax/import checks across **42 JavaScript modules**;
 - legal and attribution consistency checks;
 - standalone npm-tarball installation smoke tests;

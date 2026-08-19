@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tgz
+.DS_Store
+coverage/
+.nyc_output/
+.pi-cascade/
+.pi/cascade.local.json
+.env
+.env.*
+!.env.example
+*.bundle
+*.zip
+*.tar.gz
+npm-debug.log*

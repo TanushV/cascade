@@ -24,15 +24,15 @@ jobs:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Materialize and validate clean source tree
+      - name: Apply and validate the clean Cascade 0.3 patch
         shell: bash
         run: |
           set -euo pipefail
-          cat .publish/chunk-* | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
-          echo "78b36e6318866d69acdb8c58523c33a3bcf938b01d1bab85576b73cfde3c52d9  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
-          mkdir -p "$RUNNER_TEMP/cascade-source"
-          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
-          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+          cat .publish/chunk-* | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"
+          echo "475dc084052be9975284a7099474a0788e301b65259c86cc61708ea6191bce3a  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict
+          gzip -dc "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch"
+          git apply --index "$RUNNER_TEMP/cascade.patch"
+          rm -rf .publish .github/workflows/apply-cascade-0.3.yml
           npm ci --ignore-scripts --no-audit --no-fund
           npm run ci
           git config user.name "TanushV"

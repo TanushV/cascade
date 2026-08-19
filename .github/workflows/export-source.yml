@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar --exclude=.git --exclude=dist -czf "$RUNNER_TEMP/cascade-installed.tgz" .
+          tar --exclude=.git -czf "$RUNNER_TEMP/cascade-installed.tgz" .
       - uses: actions/upload-artifact@v4
         with:
           name: cascade-installed

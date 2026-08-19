@@ -1,0 +1,12 @@
+{
+  "mode": "dual",
+  "timeoutMs": 900000,
+  "tasks": [
+    {
+      "id": "example",
+      "cwd": ".",
+      "prompt": "Inspect this fixture and satisfy its tests.",
+      "verification": ["node --test"]
+    }
+  ]
+}

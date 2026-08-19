@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "description": "Initial transparent trajectory router; replaceable by a learned policy artifact after replay evaluation.",
+  "features": [
+    "toolError",
+    "repeatedError",
+    "verifierFailure",
+    "largeDiff",
+    "manyFiles",
+    "explicitUncertainty",
+    "staleProgress",
+    "protectedPath"
+  ],
+  "implementation": "extension/core/router.mjs"
+}

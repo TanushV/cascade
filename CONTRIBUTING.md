@@ -7,11 +7,11 @@ Thank you for improving Pi Cascade. Keep changes narrow, tested, and compatible 
 ```bash
 git clone https://github.com/TanushV/cascade.git
 cd cascade
-npm install
+npm install --ignore-scripts
 npm run ci
 ```
 
-Node.js 22.19 or newer is required. The first install materializes the checksum-verified source archive when the normal source tree is not already present.
+Node.js 22.19 or newer is required.
 
 ## Pull requests
 

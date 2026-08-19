@@ -21,6 +21,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Resolve tag
         id: tag
@@ -31,28 +32,23 @@ jobs:
           else
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.tag.outputs.name }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
-      - name: Materialize verified source when needed
-        shell: bash
-        run: |
-          if [[ -f .bootstrap/materialize.mjs ]]; then
-            node .bootstrap/materialize.mjs
-          fi
+          cache: npm
       - name: Verify tag matches package version
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(node -p "require('./package.json').version")"
           test "${{ steps.tag.outputs.name }}" = "v$VERSION"
-      - name: Install pinned runtime dependency
-        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build and validate release artifacts
         run: npm run release:local -- --out dist/release
       - name: Publish GitHub release

@@ -28,10 +28,13 @@ if (actual !== EXPECTED_SHA256) {
 
 const temp = await mkdtemp(join(tmpdir(), "pi-cascade-source-"));
 try {
-  const archivePath = join(temp, "source.tar.gz");
-  await writeFile(archivePath, archive);
-  const extract = spawnSync("tar", ["-xzf", archivePath, "-C", temp], {
-    cwd: root,
+  const archiveName = "source.tar.gz";
+  await writeFile(join(temp, archiveName), archive);
+
+  // Use paths relative to cwd. Git for Windows' tar treats `D:\\...` as a
+  // remote archive spec because of the drive-letter colon.
+  const extract = spawnSync("tar", ["-xzf", archiveName], {
+    cwd: temp,
     encoding: "utf8",
   });
   if (extract.status !== 0) {

@@ -31,7 +31,7 @@ jobs:
           else
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.tag.outputs.name }}
           fetch-depth: 0

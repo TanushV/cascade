@@ -207,7 +207,9 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
     throw new Error(`Installed self-test failed: ${selfTest}`);
   }
 
-  const globalCli = join(globalPrefix, "bin", process.platform === "win32" ? "cascade.cmd" : "cascade");
+  const globalCli = process.platform === "win32"
+  ? join(globalPrefix, "cascade.cmd")
+  : join(globalPrefix, "bin", "cascade");
   const globalVersion = run(globalCli, ["--version"], { cwd: installDir, capture: true });
   if (!globalVersion.includes(`cascade ${packageVersion}`) || !globalVersion.includes("0.84.2-smoke")) {
     throw new Error(`Global standalone installation did not resolve its runtime: ${globalVersion}`);
@@ -217,7 +219,9 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
     throw new Error(`Global standalone self-test failed: ${globalSelfTest}`);
   }
 
-  const gitCli = join(gitPrefix, "bin", process.platform === "win32" ? "cascade.cmd" : "cascade");
+  const gitCli = process.platform === "win32"
+  ? join(gitPrefix, "cascade.cmd")
+  : join(gitPrefix, "bin", "cascade");
   const gitVersion = run(gitCli, ["--version"], { cwd: installDir, capture: true });
   if (!gitVersion.includes(`cascade ${packageVersion}`) || !gitVersion.includes("0.84.2-smoke")) {
     throw new Error(`Git-source installation did not resolve its runtime: ${gitVersion}`);

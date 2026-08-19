@@ -6,12 +6,16 @@ on:
       - agent/native-pi-tui-parity
     paths:
       - .export-source
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
   export:
+    if: github.head_ref == 'agent/native-pi-tui-parity' || github.ref_name == 'agent/native-pi-tui-parity'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

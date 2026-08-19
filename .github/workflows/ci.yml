@@ -9,10 +9,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Node ${{ matrix.node }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -26,19 +31,14 @@ jobs:
           - os: windows-latest
             node: 22.19.0
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           registry-url: https://registry.npmjs.org
-      - name: Materialize verified source when needed
-        shell: bash
-        run: |
-          if [[ -f .bootstrap/materialize.mjs ]]; then
-            node .bootstrap/materialize.mjs
-          fi
-      - name: Install pinned runtime dependency
-        run: npm install --ignore-scripts --no-audit --no-fund
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Test, static checks, legal checks, and package smoke tests
         run: npm run ci
 
@@ -46,9 +46,10 @@ jobs:
     name: Install exact pushed commit from GitHub
     if: github.event_name == 'push'
     runs-on: macos-latest
+    timeout-minutes: 15
     needs: test
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
@@ -56,9 +57,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PREFIX="$RUNNER_TEMP/pi-cascade-prefix"
+          PREFIX="$RUNNER_TEMP/cascade-prefix"
           npm install -g "git+https://github.com/${GITHUB_REPOSITORY}.git#${GITHUB_SHA}" \
-            --prefix "$PREFIX" --no-audit --no-fund
-          "$PREFIX/bin/pi-cascade" --version
-          "$PREFIX/bin/pi-cascade" self-test
-          "$PREFIX/bin/pi-cascade" runtime
+            --prefix "$PREFIX" --ignore-scripts --no-audit --no-fund
+          "$PREFIX/bin/cascade" --version
+          "$PREFIX/bin/cascade" self-test
+          "$PREFIX/bin/cascade" runtime

@@ -6,16 +6,7 @@
 
 Pi Cascade is a standalone command-line coding agent with a configurable one- or two-model orchestration layer. You install and run `pi-cascade`; a separate global `pi` installation is not required.
 
-It provides:
-
-- one active workspace-owning **worker**;
-- one independently configured, on-demand **expert**;
-- evidence-centered expert handoffs instead of full transcript replay;
-- trajectory-conditioned escalation;
-- deterministic verification and completion gates;
-- endpoint privacy controls for Contributor traffic;
-- a replay-gated, versioned harness-learning plane;
-- an optional bounded programmatic workspace.
+It provides one active workspace-owning **worker**, one independently configured on-demand **expert**, evidence-centered handoffs, trajectory-conditioned escalation, deterministic verification, endpoint privacy controls, and a replay-gated harness-learning plane.
 
 The implementation targets `@earendil-works/pi-coding-agent@0.84.2` at upstream commit `59a71b235dadb4ad0d67557a8abb0aaa093e68b4`. See [`UPSTREAM.json`](UPSTREAM.json).
 
@@ -24,10 +15,10 @@ The implementation targets `@earendil-works/pi-coding-agent@0.84.2` at upstream 
 Requirements: Node.js `22.19.0` or newer, npm, and Internet access for the first installation.
 
 ```bash
-npm install -g github:TanushV/cascade
+npm install -g github:TanushV/cascade --ignore-scripts
 ```
 
-The GitHub source currently contains a one-time, SHA-256-verified source materializer. npm reconstructs the exact tested source tree before packaging and installs the pinned Pi runtime dependency automatically. Do not add `--ignore-scripts` to this GitHub-source command while the materializer is present.
+npm installs the pinned Pi runtime dependency automatically. A separate `npm install -g @earendil-works/pi-coding-agent` is not needed.
 
 Verify:
 
@@ -45,8 +36,6 @@ bundled-pi 0.84.2
 
 Pi Cascade self-test passed.
 ```
-
-A separate `npm install -g @earendil-works/pi-coding-agent` is not needed.
 
 ## Start using it
 
@@ -87,15 +76,7 @@ pi-cascade --approve \
 
 ## Model configuration
 
-Both roles are fully configurable. Each can independently select:
-
-- provider and model ID;
-- reasoning level;
-- tool allowlist;
-- role instructions;
-- timeout and output limits;
-- provider base URL, API adapter, headers, and credential source;
-- cost and escalation budgets.
+Both roles are fully configurable. Each can independently select provider and model ID, reasoning level, tool allowlist, role instructions, timeout and output limits, provider base URL, API adapter, headers, credential source, and cost budgets.
 
 Minimal dual-model example in `.pi/cascade.json`:
 
@@ -165,10 +146,7 @@ Only one process owns edits at a time. Expert episodes receive a compact, redact
 
 ## Privacy boundary
 
-A model whose identifier matches the Contributor pattern is denied unless both:
-
-1. `privacy.allowContributor` is `true`; and
-2. `privacy.classification` is `public`.
+A model whose identifier matches the Contributor pattern is denied unless both `privacy.allowContributor` is `true` and `privacy.classification` is `public`.
 
 Secret redaction and denied-path filtering are defense in depth, not a substitute for a real sandbox. Pi Cascade and Pi extensions normally execute with the permissions of the launching user.
 
@@ -177,18 +155,16 @@ Secret redaction and denied-path filtering are defense in depth, not a substitut
 ```bash
 git clone https://github.com/TanushV/cascade.git
 cd cascade
-npm install
+npm install --ignore-scripts
 npm run ci
 ```
 
-The first `npm install` verifies and materializes the source archive when needed. Once the normal source tree is present, standard development commands apply.
-
 ## Validation
 
-The verified base source archive plus its reviewable cross-platform overlays passed locally:
+The materialized source tree passed locally:
 
 - **45 automated tests, 0 failures**;
-- static syntax/import checks across **42 JavaScript modules**;
+- static syntax/import checks across **42 packaged runtime modules**;
 - legal and attribution consistency checks;
 - standalone npm-tarball installation smoke tests;
 - Git-source installation simulation;
@@ -202,12 +178,6 @@ Live provider calls require your own credentials and are validated with `pi-casc
 
 Pi Cascade is MIT-licensed. Pi remains a separately installed MIT-licensed dependency; its source tree is not incorporated into Pi Cascade's implementation. The repository preserves Pi's copyright and license notice and records the exact compatible package and commit.
 
-See:
-
-- [`LICENSE`](LICENSE)
-- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
-- [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt)
-- [`UPSTREAM.json`](UPSTREAM.json)
-- [`docs/legal.md`](docs/legal.md)
+See [`LICENSE`](LICENSE), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt), [`UPSTREAM.json`](UPSTREAM.json), and [`docs/legal.md`](docs/legal.md).
 
 This is an engineering licensing review, not formal legal advice.

@@ -22,10 +22,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar --exclude=.git --exclude=node_modules --exclude=dist -czf cascade-source.tgz .
+          git archive --format=tar.gz --output="$RUNNER_TEMP/cascade-source.tgz" HEAD
       - uses: actions/upload-artifact@v4
         with:
           name: cascade-source
-          path: cascade-source.tgz
+          path: ${{ runner.temp }}/cascade-source.tgz
           if-no-files-found: error
           retention-days: 1

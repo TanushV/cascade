@@ -104,12 +104,7 @@ for (const relativePath of [
   await writeFile(path, text, "utf8");
 }
 
-for (const relativePath of ["scripts/package-smoke.mjs", "scripts/release-local.mjs"]) {
-  const path = join(root, relativePath);
-  let text = await readFile(path, "utf8");
-  text = text.replace(
-    "function pack(cwd) {",
-    `function runNpm(args, options = {}) {
+const npmHelper = `function runNpm(args, options = {}) {
   const npmCli = process.env.npm_execpath;
   if (npmCli) return run(process.execPath, [npmCli, ...args], options);
   return run(process.platform === "win32" ? "npm.cmd" : "npm", args, {
@@ -118,11 +113,24 @@ for (const relativePath of ["scripts/package-smoke.mjs", "scripts/release-local.
   });
 }
 
-function pack(cwd) {`,
-  );
-  text = text.split('run("npm", [').join("runNpm([");
-  await writeFile(path, text, "utf8");
-}
+`;
+
+const smokePath = join(root, "scripts", "package-smoke.mjs");
+let smoke = await readFile(smokePath, "utf8");
+if (!smoke.includes("function runNpm(")) smoke = smoke.replace("function pack(cwd) {", `${npmHelper}function pack(cwd) {`);
+smoke = smoke.split('run("npm", [').join("runNpm([");
+await writeFile(smokePath, smoke, "utf8");
+
+const releasePath = join(root, "scripts", "release-local.mjs");
+let release = await readFile(releasePath, "utf8");
+if (!release.includes("function runNpm(")) release = release.replace("function copySource(source, destination) {", `${npmHelper}function copySource(source, destination) {`);
+release = release.split('run("npm", [').join("runNpm([");
+release = release.replace(
+  'const raw = execFileSync("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", options.out], {\n    cwd: root,\n    encoding: "utf8"\n  });',
+  'const raw = runNpm(["pack", "--json", "--ignore-scripts", "--pack-destination", options.out], {\n    cwd: root,\n    encoding: "utf8",\n    stdio: ["ignore", "pipe", "pipe"]\n  });',
+);
+release = release.replace('new Set(["node_modules", ".git", ".pi", "dist"])', 'new Set(["node_modules", ".git", ".cascade", "dist"])');
+await writeFile(releasePath, release, "utf8");
 
 const materializePattern = /\n      - name: Materialize verified source when needed\n        shell: bash\n        run: \|\n          if \[\[ -f \.bootstrap\/materialize\.mjs \]\]; then\n            node \.bootstrap\/materialize\.mjs\n          fi\n/g;
 for (const relativePath of [
@@ -158,13 +166,13 @@ await writeFile(join(root, ".gitattributes"), "* text=auto eol=lf\n*.cmd text eo
 
 const leftovers = [];
 for (const path of await collect(root, [])) {
-  if (path.endsWith("rename-to-cascade.mjs")) continue;
-  if (path.includes(`${join(".github", "workflows")}${join("", "rename-cascade")}`)) continue;
+  const name = relative(root, path).replaceAll("\\", "/");
+  if (name === "scripts/rename-to-cascade.mjs" || name.includes("rename-cascade")) continue;
   const buffer = await readFile(path);
   if (buffer.includes(0)) continue;
   const text = buffer.toString("utf8");
   for (const token of ["PI_CASCADE", "pi-cascade", "Pi Cascade"]) {
-    if (text.includes(token)) leftovers.push(`${relative(root, path)} contains ${token}`);
+    if (text.includes(token)) leftovers.push(`${name} contains ${token}`);
   }
 }
 if (leftovers.length > 0) {

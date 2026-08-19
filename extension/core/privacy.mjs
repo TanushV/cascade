@@ -126,7 +126,7 @@ export function inspectToolCallForPrivacy({ toolName, input, cwd, config }) {
   const denyPatterns = config.privacy.denyPaths || [];
   for (const candidate of extractCandidatePaths(toolName, input)) {
     if (isDeniedPath(cwd, candidate, denyPatterns)) {
-      return { blocked: true, reason: `Pi Cascade privacy policy blocks ${toolName} on ${candidate}` };
+      return { blocked: true, reason: `Cascade privacy policy blocks ${toolName} on ${candidate}` };
     }
   }
 
@@ -136,11 +136,11 @@ export function inspectToolCallForPrivacy({ toolName, input, cwd, config }) {
     for (const pattern of denyPatterns) {
       const literal = pattern.replaceAll("**/", "").replaceAll("**", "").replaceAll("*", "");
       if (literal && normalized.toLowerCase().includes(literal.toLowerCase())) {
-        return { blocked: true, reason: `Pi Cascade privacy policy blocks a bash command referencing ${pattern}` };
+        return { blocked: true, reason: `Cascade privacy policy blocks a bash command referencing ${pattern}` };
       }
     }
     if (/\b(?:env|printenv|set)\b/i.test(command) && /(?:key|token|secret|password|credential)/i.test(command)) {
-      return { blocked: true, reason: "Pi Cascade privacy policy blocks dumping credential-like environment values" };
+      return { blocked: true, reason: "Cascade privacy policy blocks dumping credential-like environment values" };
     }
   }
   return { blocked: false };

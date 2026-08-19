@@ -61,11 +61,11 @@ function context(cwd, sessionId = "integration-session") {
 }
 
 function withCascadeEnvironment(configPath, statePath) {
-  process.env.PI_CASCADE_CONFIG = configPath;
-  process.env.PI_CASCADE_STATE_DIR = statePath;
+  process.env.CASCADE_CONFIG = configPath;
+  process.env.CASCADE_STATE_DIR = statePath;
   return () => {
-    delete process.env.PI_CASCADE_CONFIG;
-    delete process.env.PI_CASCADE_STATE_DIR;
+    delete process.env.CASCADE_CONFIG;
+    delete process.env.CASCADE_STATE_DIR;
   };
 }
 
@@ -101,7 +101,7 @@ test("dual extension runs a fully configured isolated expert consultation", asyn
     );
     assert.equal(result.isError, false);
     assert.match(result.content[0].text, /preserve the parser invariant/);
-    assert.equal(mock.entries.at(-1).type, "pi-cascade.expert");
+    assert.equal(mock.entries.at(-1).type, "cascade.expert");
     const ledger = readFileSync(join(statePath, "dual-session.jsonl"), "utf8");
     assert.match(ledger, /expert_consultation/);
   } finally {

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible Pi Cascade problem
+description: Report a reproducible Cascade problem
 title: "[Bug]: "
 labels: [bug]
 body:
@@ -9,8 +9,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Pi Cascade version
-      placeholder: Output of pi-cascade --version
+      label: Cascade version
+      placeholder: Output of cascade --version
     validations:
       required: true
   - type: dropdown
@@ -41,5 +41,5 @@ body:
     id: diagnostics
     attributes:
       label: Sanitized diagnostics
-      description: Relevant output from pi-cascade doctor or self-test, with secrets and private paths removed.
+      description: Relevant output from cascade doctor or self-test, with secrets and private paths removed.
       render: text

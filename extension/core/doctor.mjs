@@ -102,6 +102,6 @@ export function formatDoctor(report) {
     const marker = check.ok ? "PASS" : check.severity === "warning" ? "WARN" : "FAIL";
     lines.push(`${marker.padEnd(4)} ${check.name}: ${check.detail}`);
   }
-  lines.push("", report.ok ? "Pi Cascade doctor passed." : "Pi Cascade doctor found blocking problems.");
+  lines.push("", report.ok ? "Cascade doctor passed." : "Cascade doctor found blocking problems.");
   return lines.join("\n");
 }

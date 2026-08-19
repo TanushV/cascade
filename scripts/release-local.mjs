@@ -36,8 +36,17 @@ function run(executable, args, options = {}) {
   return execFileSync(executable, args, { cwd: options.cwd || root, stdio: "inherit", ...options });
 }
 
+function runNpm(args, options = {}) {
+  const npmCli = process.env.npm_execpath;
+  if (npmCli) return run(process.execPath, [npmCli, ...args], options);
+  return run(process.platform === "win32" ? "npm.cmd" : "npm", args, {
+    ...options,
+    shell: process.platform === "win32",
+  });
+}
+
 function copySource(source, destination) {
-  const excluded = new Set(["node_modules", ".git", ".pi", "dist"]);
+  const excluded = new Set(["node_modules", ".git", ".cascade", "dist"]);
   mkdirSync(destination, { recursive: true });
   for (const entry of readdirSync(source)) {
     if (excluded.has(entry) || entry.endsWith(".tgz")) continue;
@@ -59,37 +68,38 @@ function main() {
     return;
   }
   if (!options.skipTests) {
-    run("npm", ["run", "ci"]);
+    runNpm(["run", "ci"]);
   }
 
   rmSync(options.out, { recursive: true, force: true });
   mkdirSync(options.out, { recursive: true });
 
-  const raw = execFileSync("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", options.out], {
+  const raw = runNpm(["pack", "--json", "--ignore-scripts", "--pack-destination", options.out], {
     cwd: root,
-    encoding: "utf8"
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
   });
   const pack = JSON.parse(raw);
   const npmTarball = join(options.out, pack[0].filename);
 
-  const stagingParent = mkdtempSync(join(tmpdir(), "pi-cascade-release-"));
-  const stageName = `pi-cascade-${version}`;
+  const stagingParent = mkdtempSync(join(tmpdir(), "cascade-release-"));
+  const stageName = `cascade-${version}`;
   const stage = join(stagingParent, stageName);
   try {
     copySource(root, stage);
-    const tarPath = join(options.out, `pi-cascade-${version}-full-source.tar.gz`);
-    const zipPath = join(options.out, `pi-cascade-${version}-full-source.zip`);
+    const tarPath = join(options.out, `cascade-${version}-full-source.tar.gz`);
+    const zipPath = join(options.out, `cascade-${version}-full-source.zip`);
     run("tar", ["-czf", tarPath, stageName], { cwd: stagingParent });
     run("zip", ["-qr", zipPath, stageName], { cwd: stagingParent });
 
 
-    const readmePath = join(options.out, `pi-cascade-${version}-README.md`);
-    const testReportPath = join(options.out, `pi-cascade-${version}-TEST_REPORT.md`);
+    const readmePath = join(options.out, `cascade-${version}-README.md`);
+    const testReportPath = join(options.out, `cascade-${version}-TEST_REPORT.md`);
     cpSync(join(root, "README.md"), readmePath);
     cpSync(join(root, "TEST_REPORT.md"), testReportPath);
 
     const files = [npmTarball, tarPath, zipPath, readmePath, testReportPath];
-    const checksumPath = join(options.out, `pi-cascade-${version}-SHA256SUMS.txt`);
+    const checksumPath = join(options.out, `cascade-${version}-SHA256SUMS.txt`);
     writeFileSync(
       checksumPath,
       `${files.map((path) => `${sha256(path)}  ${basename(path)}`).join("\n")}\n`,

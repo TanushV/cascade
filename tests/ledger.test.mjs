@@ -10,7 +10,7 @@ import { deepClone } from "../extension/core/util.mjs";
 test("evidence ledger persists redacted bounded handoff", () => {
   const state = mkdtempSync(join(tmpdir(), "cascade-ledger-state-"));
   const cwd = mkdtempSync(join(tmpdir(), "cascade-ledger-cwd-"));
-  process.env.PI_CASCADE_STATE_DIR = state;
+  process.env.CASCADE_STATE_DIR = state;
   const config = deepClone(DEFAULT_CONFIG);
   config.mode = "single";
   config.evidence.persist = true;
@@ -29,7 +29,7 @@ test("evidence ledger persists redacted bounded handoff", () => {
   assert.doesNotMatch(json, /abcdefghijklmnop/);
   assert.match(json, /REDACTED/);
   assert.ok(loadLedgerFile(ledger.path).length >= 3);
-  delete process.env.PI_CASCADE_STATE_DIR;
+  delete process.env.CASCADE_STATE_DIR;
 });
 
 test("cost estimator uses per-million rates", () => {

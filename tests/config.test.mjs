@@ -16,19 +16,19 @@ test("configuration merges trusted project and environment overrides", () => {
   }));
   const env = {
     ...process.env,
-    PI_CASCADE_WORKER: "openrouter/google/gemini-test",
-    PI_CASCADE_EXPERT: "openrouter/anthropic/expert-test",
-    PI_CASCADE_MODE: "single",
-    PI_CASCADE_ALLOW_CONTRIBUTOR: "0",
-    PI_CASCADE_WORKER_TOOLS: "read,grep,bash",
-    PI_CASCADE_WORKER_INSTRUCTIONS: "worker override",
-    PI_CASCADE_EXPERT_TOOLS: '["read","grep"]',
-    PI_CASCADE_EXPERT_INSTRUCTIONS: "expert override",
-    PI_CASCADE_EXPERT_TIMEOUT_MS: "12345",
-    PI_CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS: "54321",
-    PI_CASCADE_MAX_EXPERT_CALLS: "2",
-    PI_CASCADE_MAX_EXPERT_COST_USD: "1.5",
-    PI_CASCADE_MAX_SESSION_COST_USD: "3.5"
+    CASCADE_WORKER: "openrouter/google/gemini-test",
+    CASCADE_EXPERT: "openrouter/anthropic/expert-test",
+    CASCADE_MODE: "single",
+    CASCADE_ALLOW_CONTRIBUTOR: "0",
+    CASCADE_WORKER_TOOLS: "read,grep,bash",
+    CASCADE_WORKER_INSTRUCTIONS: "worker override",
+    CASCADE_EXPERT_TOOLS: '["read","grep"]',
+    CASCADE_EXPERT_INSTRUCTIONS: "expert override",
+    CASCADE_EXPERT_TIMEOUT_MS: "12345",
+    CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS: "54321",
+    CASCADE_MAX_EXPERT_CALLS: "2",
+    CASCADE_MAX_EXPERT_COST_USD: "1.5",
+    CASCADE_MAX_SESSION_COST_USD: "3.5"
   };
   const result = loadEffectiveConfig({ cwd, projectTrusted: true, env });
   assert.equal(result.config.mode, "single");
@@ -55,7 +55,7 @@ test("untrusted project configuration is ignored", () => {
     schemaVersion: 1,
     worker: { provider: "malicious", model: "redirect" }
   }));
-  const result = loadEffectiveConfig({ cwd, projectTrusted: false, env: { ...process.env, PI_CASCADE_MODE: "single" } });
+  const result = loadEffectiveConfig({ cwd, projectTrusted: false, env: { ...process.env, CASCADE_MODE: "single" } });
   assert.notEqual(result.config.worker.provider, "malicious");
   assert.ok(!result.sources.some((source) => source.type === "project"));
 });
@@ -65,7 +65,7 @@ test("example configuration validates and requires explicit Contributor opt-in",
   assert.equal(example.privacy.classification, "unknown");
   assert.equal(example.privacy.allowContributor, false);
   const validation = validateConfig({
-    ...loadEffectiveConfig({ cwd: process.cwd(), projectTrusted: false, env: { ...process.env, PI_CASCADE_MODE: "single" } }).config,
+    ...loadEffectiveConfig({ cwd: process.cwd(), projectTrusted: false, env: { ...process.env, CASCADE_MODE: "single" } }).config,
     ...example
   });
   assert.deepEqual(validation.errors, []);
@@ -87,7 +87,7 @@ test("enabled programmatic workspace requires an explicit sandbox decision", () 
   const effective = loadEffectiveConfig({
     cwd: process.cwd(),
     projectTrusted: false,
-    env: { ...process.env, PI_CASCADE_MODE: "single" },
+    env: { ...process.env, CASCADE_MODE: "single" },
     throwOnError: false
   }).config;
   const validation = validateConfig({ ...effective, ...config });

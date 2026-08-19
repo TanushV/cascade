@@ -11,7 +11,7 @@ import { deepClone } from "../extension/core/util.mjs";
 test("ledger resumes Pi session totals and user goal without resetting budgets", () => {
   const state = mkdtempSync(join(tmpdir(), "cascade-resume-state-"));
   const cwd = mkdtempSync(join(tmpdir(), "cascade-resume-cwd-"));
-  process.env.PI_CASCADE_STATE_DIR = state;
+  process.env.CASCADE_STATE_DIR = state;
   const config = deepClone(DEFAULT_CONFIG);
   config.privacy.redactSecrets = false;
   const first = new EvidenceLedger({ cwd, config, sessionId: "pi-session-123" });
@@ -33,7 +33,7 @@ test("ledger resumes Pi session totals and user goal without resetting budgets",
   assert.equal(resumed.totals().expertCostUsd, 0.5);
   assert.equal(resumed.totals().workerCostUsd, 0.125);
   assert.equal(resumed.latest("session_resume")?.kind, "session_resume");
-  delete process.env.PI_CASCADE_STATE_DIR;
+  delete process.env.CASCADE_STATE_DIR;
 });
 
 test("router restores trajectory and enforces the total session budget", () => {
@@ -66,7 +66,7 @@ test("router restores trajectory and enforces the total session budget", () => {
 test("ledger restores complete cost totals even when history exceeds its memory window", () => {
   const state = mkdtempSync(join(tmpdir(), "cascade-long-resume-state-"));
   const cwd = mkdtempSync(join(tmpdir(), "cascade-long-resume-cwd-"));
-  process.env.PI_CASCADE_STATE_DIR = state;
+  process.env.CASCADE_STATE_DIR = state;
   try {
     const config = deepClone(DEFAULT_CONFIG);
     config.privacy.redactSecrets = false;
@@ -91,6 +91,6 @@ test("ledger restores complete cost totals even when history exceeds its memory 
     assert.equal(resumed.totals().expertCostUsd, 0.75);
     assert.equal(resumed.totals().workerCostUsd, 0.25);
   } finally {
-    delete process.env.PI_CASCADE_STATE_DIR;
+    delete process.env.CASCADE_STATE_DIR;
   }
 });

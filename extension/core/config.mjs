@@ -17,15 +17,15 @@ import {
 } from "./util.mjs";
 
 export function getGlobalConfigPath(env = process.env) {
-  if (env.PI_CASCADE_CONFIG_GLOBAL) return resolve(env.PI_CASCADE_CONFIG_GLOBAL);
-  const piAgentDir = env.PI_AGENT_DIR ? resolve(env.PI_AGENT_DIR) : join(homedir(), ".pi", "agent");
-  return join(piAgentDir, "cascade.json");
+  if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
+  const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(homedir(), ".config");
+  return join(configHome, "cascade", "config.json");
 }
 
 export function findProjectRoot(cwd) {
   let current = resolve(cwd);
   for (;;) {
-    if (existsSync(join(current, ".pi"))) return current;
+    if (existsSync(join(current, ".cascade"))) return current;
     const parent = dirname(current);
     if (parent === current) return resolve(cwd);
     current = parent;
@@ -33,8 +33,8 @@ export function findProjectRoot(cwd) {
 }
 
 export function getProjectConfigPath(cwd, env = process.env) {
-  if (env.PI_CASCADE_CONFIG_PROJECT) return resolve(env.PI_CASCADE_CONFIG_PROJECT);
-  return join(findProjectRoot(cwd), ".pi", "cascade.json");
+  if (env.CASCADE_CONFIG_PROJECT) return resolve(env.CASCADE_CONFIG_PROJECT);
+  return join(findProjectRoot(cwd), ".cascade", "config.json");
 }
 
 function parseBooleanEnvironment(value) {
@@ -68,84 +68,84 @@ function parseListEnvironment(value) {
 
 export function environmentOverrides(env = process.env) {
   const result = {};
-  if (env.PI_CASCADE_MODE) result.mode = env.PI_CASCADE_MODE;
-  if (env.PI_CASCADE_PI_BIN) result.piBinary = env.PI_CASCADE_PI_BIN;
+  if (env.CASCADE_MODE) result.mode = env.CASCADE_MODE;
+  if (env.CASCADE_PI_BIN) result.piBinary = env.CASCADE_PI_BIN;
 
-  const worker = parseModelReference(env.PI_CASCADE_WORKER || "");
+  const worker = parseModelReference(env.CASCADE_WORKER || "");
   if (worker) result.worker = worker;
-  if (env.PI_CASCADE_WORKER_THINKING) {
-    result.worker = { ...(result.worker || {}), thinking: env.PI_CASCADE_WORKER_THINKING };
+  if (env.CASCADE_WORKER_THINKING) {
+    result.worker = { ...(result.worker || {}), thinking: env.CASCADE_WORKER_THINKING };
   }
-  if (env.PI_CASCADE_WORKER_TOOLS !== undefined) {
-    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.PI_CASCADE_WORKER_TOOLS) };
+  if (env.CASCADE_WORKER_TOOLS !== undefined) {
+    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS) };
   }
-  if (env.PI_CASCADE_WORKER_INSTRUCTIONS !== undefined) {
-    result.worker = { ...(result.worker || {}), instructions: String(env.PI_CASCADE_WORKER_INSTRUCTIONS) };
+  if (env.CASCADE_WORKER_INSTRUCTIONS !== undefined) {
+    result.worker = { ...(result.worker || {}), instructions: String(env.CASCADE_WORKER_INSTRUCTIONS) };
   }
-  const expert = parseModelReference(env.PI_CASCADE_EXPERT || "");
+  const expert = parseModelReference(env.CASCADE_EXPERT || "");
   if (expert) result.expert = expert;
-  if (env.PI_CASCADE_EXPERT_THINKING) {
-    result.expert = { ...(result.expert || {}), thinking: env.PI_CASCADE_EXPERT_THINKING };
+  if (env.CASCADE_EXPERT_THINKING) {
+    result.expert = { ...(result.expert || {}), thinking: env.CASCADE_EXPERT_THINKING };
   }
-  if (env.PI_CASCADE_EXPERT_TOOLS !== undefined) {
-    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.PI_CASCADE_EXPERT_TOOLS) };
+  if (env.CASCADE_EXPERT_TOOLS !== undefined) {
+    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS) };
   }
-  if (env.PI_CASCADE_EXPERT_INSTRUCTIONS !== undefined) {
-    result.expert = { ...(result.expert || {}), instructions: String(env.PI_CASCADE_EXPERT_INSTRUCTIONS) };
+  if (env.CASCADE_EXPERT_INSTRUCTIONS !== undefined) {
+    result.expert = { ...(result.expert || {}), instructions: String(env.CASCADE_EXPERT_INSTRUCTIONS) };
   }
-  const expertTimeoutMs = parseNumberEnvironment(env.PI_CASCADE_EXPERT_TIMEOUT_MS, "PI_CASCADE_EXPERT_TIMEOUT_MS");
+  const expertTimeoutMs = parseNumberEnvironment(env.CASCADE_EXPERT_TIMEOUT_MS, "CASCADE_EXPERT_TIMEOUT_MS");
   if (expertTimeoutMs !== undefined) result.expert = { ...(result.expert || {}), timeoutMs: expertTimeoutMs };
-  const expertMaxOutput = parseNumberEnvironment(env.PI_CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS, "PI_CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS");
+  const expertMaxOutput = parseNumberEnvironment(env.CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS, "CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS");
   if (expertMaxOutput !== undefined) result.expert = { ...(result.expert || {}), maxOutputCharacters: expertMaxOutput };
 
-  const allowContributor = parseBooleanEnvironment(env.PI_CASCADE_ALLOW_CONTRIBUTOR);
+  const allowContributor = parseBooleanEnvironment(env.CASCADE_ALLOW_CONTRIBUTOR);
   if (allowContributor !== undefined) result.privacy = { allowContributor };
-  if (env.PI_CASCADE_CLASSIFICATION) {
-    result.privacy = { ...(result.privacy || {}), classification: env.PI_CASCADE_CLASSIFICATION };
+  if (env.CASCADE_CLASSIFICATION) {
+    result.privacy = { ...(result.privacy || {}), classification: env.CASCADE_CLASSIFICATION };
   }
 
 
-  const autoConsult = parseBooleanEnvironment(env.PI_CASCADE_AUTO_CONSULT);
+  const autoConsult = parseBooleanEnvironment(env.CASCADE_AUTO_CONSULT);
   if (autoConsult !== undefined) result.routing = { autoConsult };
-  if (env.PI_CASCADE_HARNESS_MODE) {
-    result.harnessLearning = { mode: env.PI_CASCADE_HARNESS_MODE };
+  if (env.CASCADE_HARNESS_MODE) {
+    result.harnessLearning = { mode: env.CASCADE_HARNESS_MODE };
   }
 
   const budgetMappings = [
-    ["PI_CASCADE_MAX_EXPERT_CALLS", "maxExpertCalls"],
-    ["PI_CASCADE_MAX_EXPERT_COST_USD", "maxExpertCostUsd"],
-    ["PI_CASCADE_MAX_SESSION_COST_USD", "maxSessionEstimatedCostUsd"],
-    ["PI_CASCADE_MAX_EVIDENCE_CHARACTERS", "maxEvidenceCharacters"],
-    ["PI_CASCADE_MAX_LEDGER_ENTRIES", "maxLedgerEntriesInHandoff"]
+    ["CASCADE_MAX_EXPERT_CALLS", "maxExpertCalls"],
+    ["CASCADE_MAX_EXPERT_COST_USD", "maxExpertCostUsd"],
+    ["CASCADE_MAX_SESSION_COST_USD", "maxSessionEstimatedCostUsd"],
+    ["CASCADE_MAX_EVIDENCE_CHARACTERS", "maxEvidenceCharacters"],
+    ["CASCADE_MAX_LEDGER_ENTRIES", "maxLedgerEntriesInHandoff"]
   ];
   for (const [environmentName, configName] of budgetMappings) {
     const value = parseNumberEnvironment(env[environmentName], environmentName);
     if (value !== undefined) result.budgets = { ...(result.budgets || {}), [configName]: value };
   }
 
-  const workspaceEnabled = parseBooleanEnvironment(env.PI_CASCADE_WORKSPACE);
+  const workspaceEnabled = parseBooleanEnvironment(env.CASCADE_WORKSPACE);
   if (workspaceEnabled !== undefined) result.workspaceRuntime = { enabled: workspaceEnabled };
-  const workspaceUnsandboxed = parseBooleanEnvironment(env.PI_CASCADE_WORKSPACE_UNSANDBOXED);
+  const workspaceUnsandboxed = parseBooleanEnvironment(env.CASCADE_WORKSPACE_UNSANDBOXED);
   if (workspaceUnsandboxed !== undefined) {
     result.workspaceRuntime = { ...(result.workspaceRuntime || {}), allowUnsandboxed: workspaceUnsandboxed };
   }
-  if (env.PI_CASCADE_WORKSPACE_PYTHON) {
-    result.workspaceRuntime = { ...(result.workspaceRuntime || {}), pythonBinary: env.PI_CASCADE_WORKSPACE_PYTHON };
+  if (env.CASCADE_WORKSPACE_PYTHON) {
+    result.workspaceRuntime = { ...(result.workspaceRuntime || {}), pythonBinary: env.CASCADE_WORKSPACE_PYTHON };
   }
-  if (env.PI_CASCADE_WORKSPACE_SANDBOX_COMMAND !== undefined) {
+  if (env.CASCADE_WORKSPACE_SANDBOX_COMMAND !== undefined) {
     result.workspaceRuntime = {
       ...(result.workspaceRuntime || {}),
-      sandboxCommand: parseListEnvironment(env.PI_CASCADE_WORKSPACE_SANDBOX_COMMAND)
+      sandboxCommand: parseListEnvironment(env.CASCADE_WORKSPACE_SANDBOX_COMMAND)
     };
   }
-  if (env.PI_CASCADE_WORKSPACE_STATE_PATH !== undefined) {
-    result.workspaceRuntime = { ...(result.workspaceRuntime || {}), statePath: String(env.PI_CASCADE_WORKSPACE_STATE_PATH) };
+  if (env.CASCADE_WORKSPACE_STATE_PATH !== undefined) {
+    result.workspaceRuntime = { ...(result.workspaceRuntime || {}), statePath: String(env.CASCADE_WORKSPACE_STATE_PATH) };
   }
   for (const [environmentName, configName] of [
-    ["PI_CASCADE_WORKSPACE_TIMEOUT_MS", "timeoutMs"],
-    ["PI_CASCADE_WORKSPACE_MAX_CODE_CHARACTERS", "maxCodeCharacters"],
-    ["PI_CASCADE_WORKSPACE_MAX_OUTPUT_CHARACTERS", "maxOutputCharacters"],
-    ["PI_CASCADE_WORKSPACE_MAX_STATE_CHARACTERS", "maxStateCharacters"]
+    ["CASCADE_WORKSPACE_TIMEOUT_MS", "timeoutMs"],
+    ["CASCADE_WORKSPACE_MAX_CODE_CHARACTERS", "maxCodeCharacters"],
+    ["CASCADE_WORKSPACE_MAX_OUTPUT_CHARACTERS", "maxOutputCharacters"],
+    ["CASCADE_WORKSPACE_MAX_STATE_CHARACTERS", "maxStateCharacters"]
   ]) {
     const value = parseNumberEnvironment(env[environmentName], environmentName);
     if (value !== undefined) result.workspaceRuntime = { ...(result.workspaceRuntime || {}), [configName]: value };
@@ -287,7 +287,7 @@ export function loadEffectiveConfig({
 
   const validation = validateConfig(config);
   if (throwOnError && validation.errors.length > 0) {
-    throw new Error(`Invalid Pi Cascade configuration:\n- ${validation.errors.join("\n- ")}`);
+    throw new Error(`Invalid Cascade configuration:\n- ${validation.errors.join("\n- ")}`);
   }
   return { config, validation, sources, globalPath, projectPath };
 }

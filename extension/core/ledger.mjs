@@ -7,9 +7,9 @@ import { redactSecrets } from "./privacy.mjs";
 import { nowIso, safeFileName, shortHash, truncateText } from "./util.mjs";
 
 function storageRoot(config, cwd) {
-  const explicit = process.env.PI_CASCADE_STATE_DIR;
+  const explicit = process.env.CASCADE_STATE_DIR;
   if (explicit) return resolve(explicit);
-  return join(homedir(), ".pi", "agent", "cascade", "sessions", shortHash(resolve(cwd), 16));
+  return join(homedir(), ".local", "state", "cascade", "sessions", shortHash(resolve(cwd), 16));
 }
 
 export function normalizeUsage(raw = {}) {

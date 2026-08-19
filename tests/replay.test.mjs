@@ -13,9 +13,9 @@ test("harness replay compares baseline and canary with direct absolute task path
   const state = join(root, "state");
   const project = join(root, "project");
   mkdirSync(project, { recursive: true });
-  process.env.PI_CASCADE_STATE_DIR = state;
+  process.env.CASCADE_STATE_DIR = state;
   const fake = join(root, "fake-cascade.mjs");
-  writeFileSync(fake, `#!/usr/bin/env node\nconst canary = Boolean(process.env.PI_CASCADE_CANARY_IDS);\nconsole.log(JSON.stringify({type:'message_end',message:{role:'assistant',content:[{type:'text',text:canary?'candidate':'baseline'}],usage:{input:100,output:20,cost:{total:canary?0.009:0.01}}}}));\n`, "utf8");
+  writeFileSync(fake, `#!/usr/bin/env node\nconst canary = Boolean(process.env.CASCADE_CANARY_IDS);\nconsole.log(JSON.stringify({type:'message_end',message:{role:'assistant',content:[{type:'text',text:canary?'candidate':'baseline'}],usage:{input:100,output:20,cost:{total:canary?0.009:0.01}}}}));\n`, "utf8");
   chmodSync(fake, 0o755);
   const manifest = join(root, "manifest.json");
   writeFileSync(manifest, JSON.stringify({
@@ -50,5 +50,5 @@ test("harness replay compares baseline and canary with direct absolute task path
   assert.equal(report.metrics.deterministicChecksPassed, true);
   assert.equal(report.admission.allowed, true);
   assert.ok(report.metrics.costDelta < 0);
-  delete process.env.PI_CASCADE_STATE_DIR;
+  delete process.env.CASCADE_STATE_DIR;
 });

@@ -15,7 +15,7 @@ export function composeExpertPrompt({ mode, question, evidenceJson, instructions
       : mode === "takeover"
         ? "You are the temporary workspace-owning expert. You may edit files using only the configured tools. Make the smallest justified change, run relevant verification, and report exactly what you changed."
         : "Investigate independently using read-only repository tools. Do not edit files.";
-  return `# Pi Cascade expert episode\n\n${access}\n\nThe worker has already investigated the task. Use the evidence packet instead of restarting blindly. Inspect repository files only when the packet leaves a material uncertainty.\n\n## Question\n${question}\n\n## Evidence packet\n\n\`\`\`json\n${evidenceJson}\n\`\`\`\n\n## Output contract\n\nReturn one JSON object and no surrounding prose:\n\n{\n  "decision": "continue-worker | redirect-worker | investigate-more | takeover | block",\n  "summary": "concise diagnosis",\n  "findings": [\n    {"claim": "...", "evidence": "file, test, command, or packet fact", "confidence": 0.0}\n  ],\n  "patchConstraints": ["..."],\n  "requiredEvidence": ["..."],\n  "nextAction": "one concrete next action",\n  "risks": ["..."],\n  "confidence": 0.0\n}\n\nDo not claim verification without naming the evidence. Prefer one decisive next action over a miniature project-management department.\n${instructions ? `\n## Additional instructions\n${instructions}\n` : ""}`;
+  return `# Cascade expert episode\n\n${access}\n\nThe worker has already investigated the task. Use the evidence packet instead of restarting blindly. Inspect repository files only when the packet leaves a material uncertainty.\n\n## Question\n${question}\n\n## Evidence packet\n\n\`\`\`json\n${evidenceJson}\n\`\`\`\n\n## Output contract\n\nReturn one JSON object and no surrounding prose:\n\n{\n  "decision": "continue-worker | redirect-worker | investigate-more | takeover | block",\n  "summary": "concise diagnosis",\n  "findings": [\n    {"claim": "...", "evidence": "file, test, command, or packet fact", "confidence": 0.0}\n  ],\n  "patchConstraints": ["..."],\n  "requiredEvidence": ["..."],\n  "nextAction": "one concrete next action",\n  "risks": ["..."],\n  "confidence": 0.0\n}\n\nDo not claim verification without naming the evidence. Prefer one decisive next action over a miniature project-management department.\n${instructions ? `\n## Additional instructions\n${instructions}\n` : ""}`;
 }
 
 function buildArgs({ config, modelConfig, mode, promptPath, projectTrusted, extensionPath }) {
@@ -50,7 +50,7 @@ export async function runExpertEpisode({
 }) {
   if (config.mode !== "dual") throw new Error("Expert episodes require dual mode");
   if (!config.expert?.provider || !config.expert?.model) throw new Error("Expert model is not configured");
-  const temporaryDirectory = mkdtempSync(join(tmpdir(), "pi-cascade-expert-"));
+  const temporaryDirectory = mkdtempSync(join(tmpdir(), "cascade-expert-"));
   const promptPath = join(temporaryDirectory, "episode.md");
   const configPath = join(temporaryDirectory, "cascade.json");
   const prompt = composeExpertPrompt({
@@ -84,10 +84,10 @@ export async function runExpertEpisode({
         cwd,
         env: {
           ...process.env,
-          PI_CASCADE_CHILD: "1",
-          PI_CASCADE_CONFIG: configPath,
-          PI_CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",
-          AI_AGENT: "pi-cascade-expert"
+          CASCADE_CHILD: "1",
+          CASCADE_CONFIG: configPath,
+          CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",
+          AI_AGENT: "cascade-expert"
         },
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true

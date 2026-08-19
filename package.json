@@ -1,19 +1,19 @@
 {
-  "name": "pi-cascade",
-  "version": "0.1.3",
+  "name": "cascade",
+  "version": "0.2.0",
   "description": "Independent configurable one- or two-model, evidence-centered coding agent powered by the Pi runtime",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "pi-cascade": "./bin/pi-cascade.mjs"
+    "cascade": "./bin/cascade.mjs"
   },
   "keywords": [
-    "pi-package",
     "coding-agent",
     "multi-model",
     "routing",
     "openrouter",
-    "muse-spark"
+    "muse-spark",
+    "pi-runtime"
   ],
   "files": [
     "bin",

@@ -5,7 +5,7 @@ import { truncateText } from "./util.mjs";
 import { spawnPi } from "./pi-runtime.mjs";
 
 export async function probeModelProfile({ config, profile, cwd, extensionPath, probeExtensionPath, timeoutMs = 120000 }) {
-  const temporaryDirectory = mkdtempSync(join(tmpdir(), "pi-cascade-probe-"));
+  const temporaryDirectory = mkdtempSync(join(tmpdir(), "cascade-probe-"));
   const configPath = join(temporaryDirectory, "cascade.json");
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}
 `, { encoding: "utf8", mode: 0o600 });
@@ -37,9 +37,9 @@ export async function probeModelProfile({ config, profile, cwd, extensionPath, p
       cwd,
       env: {
         ...process.env,
-        PI_CASCADE_CHILD: "1",
-        PI_CASCADE_CONFIG: configPath,
-        AI_AGENT: "pi-cascade-probe"
+        CASCADE_CHILD: "1",
+        CASCADE_CONFIG: configPath,
+        AI_AGENT: "cascade-probe"
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true

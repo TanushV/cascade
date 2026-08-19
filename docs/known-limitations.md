@@ -1,7 +1,7 @@
 # Known limitations
 
-- Pi Cascade is a thin Pi extension and package overlay, not a replacement agent runtime.
-- Live model availability, pricing, rate limits, and API compatibility are account- and date-dependent. Use `pi-cascade probe`.
+- Cascade is a thin Pi extension and package overlay, not a replacement agent runtime.
+- Live model availability, pricing, rate limits, and API compatibility are account- and date-dependent. Use `cascade probe`.
 - The bundled Meta profile is based on public OpenAI-compatible Model API integration information; an account may require a different current model ID or adapter.
 - Contributor redaction and path denial are defense in depth, not a proof that proprietary information cannot be inferred from ordinary source text.
 - Pi and Pi extensions execute with the launching user's permissions unless the entire process or tool surface is externally sandboxed.

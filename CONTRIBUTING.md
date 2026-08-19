@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for improving Pi Cascade. Keep changes narrow, tested, and compatible with the pinned Pi runtime.
+Thank you for improving Cascade. Keep changes narrow, tested, and compatible with the pinned Pi runtime.
 
 ## Development setup
 
@@ -18,7 +18,7 @@ Node.js 22.19 or newer is required.
 - Describe the behavior change and why it is needed.
 - Add or update tests for functional changes.
 - Run `npm run ci` before opening a pull request.
-- Do not commit credentials, provider responses containing private code, `.pi-cascade` state, or `node_modules`.
+- Do not commit credentials, provider responses containing private code, `.cascade` state, or `node_modules`.
 - Preserve `LICENSE`, `THIRD_PARTY_NOTICES.md`, `licenses/`, and `UPSTREAM.json`.
 - Avoid copying upstream Pi source. Prefer public extension APIs and documented package interfaces.
 

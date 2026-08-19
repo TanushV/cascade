@@ -10,10 +10,10 @@ Use GitHub's private vulnerability-reporting feature for this repository when av
 
 ## Important trust boundary
 
-Pi Cascade and Pi extensions execute with the permissions of the user who launches them. Model-generated shell commands and code are not automatically sandboxed. Use a container, virtual machine, or another external sandbox for untrusted repositories or generated code.
+Cascade and Pi extensions execute with the permissions of the user who launches them. Model-generated shell commands and code are not automatically sandboxed. Use a container, virtual machine, or another external sandbox for untrusted repositories or generated code.
 
 Contributor-endpoint filtering and secret redaction are defense-in-depth controls, not a confidentiality guarantee. Keep Contributor endpoints disabled for non-public repositories.
 
 ## Dependency security
 
-Pi Cascade pins `@earendil-works/pi-coding-agent` to an exact version. Dependabot monitors npm and GitHub Actions dependencies. Runtime changes to the pinned Pi version must pass the full test and package-smoke suites and update `UPSTREAM.json` and third-party notices when necessary.
+Cascade pins `@earendil-works/pi-coding-agent` to an exact version. Dependabot monitors npm and GitHub Actions dependencies. Runtime changes to the pinned Pi version must pass the full test and package-smoke suites and update `UPSTREAM.json` and third-party notices when necessary.

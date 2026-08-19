@@ -25,9 +25,9 @@ function emptyCandidateState() {
 }
 
 function stateRoot(cwd) {
-  const explicit = process.env.PI_CASCADE_STATE_DIR;
+  const explicit = process.env.CASCADE_STATE_DIR;
   if (explicit) return resolve(explicit);
-  return join(homedir(), ".pi", "agent", "cascade");
+  return join(homedir(), ".local", "state", "cascade");
 }
 
 function repositoryKey(cwd) {
@@ -157,7 +157,7 @@ export class HarnessStore {
       ? rawCandidates.candidates
       : {};
     this.canaryCandidateIds = new Set();
-    const configuredCanaries = String(process.env.PI_CASCADE_CANARY_IDS || "")
+    const configuredCanaries = String(process.env.CASCADE_CANARY_IDS || "")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
@@ -231,7 +231,7 @@ export class HarnessStore {
     const prompts = entries.filter((entry) => entry.kind === "prompt").slice(-this.config.harnessLearning.maxPromptEntries);
     const memories = entries.filter((entry) => entry.kind === "memory").slice(-this.config.harnessLearning.maxMemoryEntries);
     if (prompts.length === 0 && memories.length === 0) return "";
-    const lines = ["# Pi Cascade scoped harness", ""];
+    const lines = ["# Cascade scoped harness", ""];
     if (prompts.length) {
       lines.push("## Behavioral overlays");
       for (const entry of prompts) lines.push(`- [${entry.scope}:${entry.id}@v${entry.version}] ${entry.content}`);

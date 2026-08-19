@@ -50,7 +50,7 @@ function runtimeFromCliPath(cliPath, source = "bundled") {
 }
 
 export function resolveBundledPiRuntime({ env = process.env } = {}) {
-  const testCli = env.PI_CASCADE_INTERNAL_PI_CLI;
+  const testCli = env.CASCADE_INTERNAL_PI_CLI;
   if (testCli) return runtimeFromCliPath(testCli, "internal-override");
 
   let entryUrl;
@@ -64,7 +64,7 @@ export function resolveBundledPiRuntime({ env = process.env } = {}) {
     if (existsSync(directCli)) return runtimeFromCliPath(directCli, "bundled-direct");
     throw new Error(
       `Bundled Pi runtime ${PI_RUNTIME_PACKAGE}@${PINNED_PI_RUNTIME_VERSION} is unavailable. ` +
-      `Reinstall Pi Cascade so npm installs its runtime dependency. Original resolution error: ${error instanceof Error ? error.message : String(error)}`
+      `Reinstall Cascade so npm installs its runtime dependency. Original resolution error: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 
@@ -79,7 +79,7 @@ function isAutomaticRuntime(value) {
 }
 
 export function resolvePiRuntime(config = {}, { env = process.env } = {}) {
-  const explicit = env.PI_CASCADE_PI_BIN || config.piBinary;
+  const explicit = env.CASCADE_PI_BIN || config.piBinary;
   if (!isAutomaticRuntime(explicit)) {
     const value = String(explicit);
     const command = isAbsolute(value) || value.includes("/") || value.includes("\\") ? resolve(value) : value;
@@ -98,8 +98,8 @@ export function resolvePiRuntime(config = {}, { env = process.env } = {}) {
 
 export function assertRuntimeIsNotCascade(runtime) {
   const paths = [runtime.command, ...(runtime.argsPrefix || [])].map((value) => basename(String(value)).toLowerCase());
-  if (paths.some((name) => name === "pi-cascade" || name === "pi-cascade.mjs")) {
-    throw new Error("Pi runtime resolved to pi-cascade itself; refusing recursive launch");
+  if (paths.some((name) => name === "cascade" || name === "cascade.mjs")) {
+    throw new Error("Pi runtime resolved to cascade itself; refusing recursive launch");
   }
 }
 

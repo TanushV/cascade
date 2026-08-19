@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 - 2026-08-18
+
+### Changed
+
+- Renamed the project, npm package, executable, environment namespace, configuration paths, state paths, documentation, and release artifacts to **Cascade**.
+- The command and package are now named `cascade`.
+
+### Fixed
+
+- Made npm subprocess invocation portable on Windows by running npm through its JavaScript entry point when available.
+- Removed the completed source-bootstrap and temporary Windows-debug workflows.
+- CI now installs from the lockfile with `npm ci` and validates the materialized source tree directly.
+
 ## 0.1.3 - 2026-08-18
 
 ### Added
@@ -26,16 +39,16 @@ Standalone installation repair.
 
 ### Fixed
 
-- Pi Cascade now pins `@earendil-works/pi-coding-agent@0.84.2` as a runtime dependency.
-- The parent worker, expert subprocess, provider probe, and doctor resolve the runtime from Pi Cascade's own installation instead of requiring a global `pi` command.
+- Cascade now pins `@earendil-works/pi-coding-agent@0.84.2` as a runtime dependency.
+- The parent worker, expert subprocess, provider probe, and doctor resolve the runtime from Cascade's own installation instead of requiring a global `pi` command.
 - `piBinary` now defaults to `auto`; `--pi-bin` remains an advanced override.
-- Added `pi-cascade --version`, `pi-cascade runtime`, and `pi-cascade self-test`.
+- Added `cascade --version`, `cascade runtime`, and `cascade self-test`.
 - Added clean local and isolated global install tests where only the Cascade tarball is installed.
 - Corrected installation guidance so the tarball path is resolved from its actual download directory.
 
 ## 0.1.0 - 2026-08-18
 
-Initial end-to-end Pi Cascade implementation.
+Initial end-to-end Cascade implementation.
 
 ### Added
 

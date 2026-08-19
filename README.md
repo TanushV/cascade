@@ -1,10 +1,10 @@
-# Pi Cascade
+# Cascade
 
 [![CI](https://github.com/TanushV/cascade/actions/workflows/ci.yml/badge.svg)](https://github.com/TanushV/cascade/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Independent project:** Pi Cascade is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works. “Pi” identifies compatibility with the upstream runtime.
+> **Independent project:** Cascade is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works. “Pi” identifies compatibility with the upstream runtime.
 
-Pi Cascade is a standalone command-line coding agent with a configurable one- or two-model orchestration layer. You install and run `pi-cascade`; a separate global `pi` installation is not required.
+Cascade is a standalone command-line coding agent with a configurable one- or two-model orchestration layer. You install and run `cascade`; a separate global `pi` installation is not required.
 
 It provides one active workspace-owning **worker**, one independently configured on-demand **expert**, evidence-centered handoffs, trajectory-conditioned escalation, deterministic verification, endpoint privacy controls, and a replay-gated harness-learning plane.
 
@@ -23,25 +23,25 @@ npm installs the pinned Pi runtime dependency automatically. A separate `npm ins
 Verify:
 
 ```bash
-pi-cascade --version
-pi-cascade self-test
-pi-cascade runtime
+cascade --version
+cascade self-test
+cascade runtime
 ```
 
 Expected shape:
 
 ```text
-pi-cascade 0.1.3
+cascade 0.2.0
 bundled-pi 0.84.2
 
-Pi Cascade self-test passed.
+Cascade self-test passed.
 ```
 
 ## Start using it
 
 ```bash
 cd /path/to/your/repository
-pi-cascade init
+cascade init
 ```
 
 The generated configuration starts privacy-safe: repository classification is `unknown`, and Contributor endpoints are disabled until explicitly enabled.
@@ -56,21 +56,21 @@ export MODEL_API_KEY="..."
 Validate the installation and live endpoints:
 
 ```bash
-pi-cascade doctor --approve
-pi-cascade probe worker --approve
-pi-cascade probe expert --approve
+cascade doctor --approve
+cascade probe worker --approve
+cascade probe expert --approve
 ```
 
 Launch interactively:
 
 ```bash
-pi-cascade --approve
+cascade --approve
 ```
 
 Or provide a task directly:
 
 ```bash
-pi-cascade --approve \
+cascade --approve \
   "Inspect this repository, implement the smallest correct fix, and run the relevant checks."
 ```
 
@@ -78,7 +78,7 @@ pi-cascade --approve \
 
 Both roles are fully configurable. Each can independently select provider and model ID, reasoning level, tool allowlist, role instructions, timeout and output limits, provider base URL, API adapter, headers, credential source, and cost budgets.
 
-Minimal dual-model example in `.pi/cascade.json`:
+Minimal dual-model example in `.cascade/config.json`:
 
 ```json
 {
@@ -108,7 +108,7 @@ Minimal dual-model example in `.pi/cascade.json`:
 Single-model mode uses the same evidence, verification, privacy, checkpoint, and harness path while disabling expert admission:
 
 ```bash
-pi-cascade --single \
+cascade --single \
   --worker openrouter/vendor/model-id \
   "Repair the bug and run the repository checks"
 ```
@@ -148,7 +148,7 @@ Only one process owns edits at a time. Expert episodes receive a compact, redact
 
 A model whose identifier matches the Contributor pattern is denied unless both `privacy.allowContributor` is `true` and `privacy.classification` is `public`.
 
-Secret redaction and denied-path filtering are defense in depth, not a substitute for a real sandbox. Pi Cascade and Pi extensions normally execute with the permissions of the launching user.
+Secret redaction and denied-path filtering are defense in depth, not a substitute for a real sandbox. Cascade and Pi extensions normally execute with the permissions of the launching user.
 
 ## Development
 
@@ -172,11 +172,11 @@ The materialized source tree passed locally:
 
 GitHub Actions adds Linux, macOS, Windows, Node 22.19, Node 24, exact-commit GitHub installation, CodeQL, Dependabot, and tag-driven release automation.
 
-Live provider calls require your own credentials and are validated with `pi-cascade probe worker` and `pi-cascade probe expert`.
+Live provider calls require your own credentials and are validated with `cascade probe worker` and `cascade probe expert`.
 
 ## Legal and upstream attribution
 
-Pi Cascade is MIT-licensed. Pi remains a separately installed MIT-licensed dependency; its source tree is not incorporated into Pi Cascade's implementation. The repository preserves Pi's copyright and license notice and records the exact compatible package and commit.
+Cascade is MIT-licensed. Pi remains a separately installed MIT-licensed dependency; its source tree is not incorporated into Cascade's implementation. The repository preserves Pi's copyright and license notice and records the exact compatible package and commit.
 
 See [`LICENSE`](LICENSE), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt), [`UPSTREAM.json`](UPSTREAM.json), and [`docs/legal.md`](docs/legal.md).
 

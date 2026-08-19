@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a reproducible Pi Cascade problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a problem. Remove API keys, private source, and proprietary provider output before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Pi Cascade version
+      placeholder: Output of pi-cascade --version
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - single
+        - dual
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include the expected behavior and the actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide commands and a small public fixture when possible. Never paste credentials.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Relevant output from pi-cascade doctor or self-test, with secrets and private paths removed.
+      render: text

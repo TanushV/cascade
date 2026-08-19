@@ -28,14 +28,18 @@ jobs:
       - name: Generate dependency lockfile
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Apply rename
-        run: node scripts/rename-to-cascade.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a .github/workflows "$RUNNER_TEMP/cascade-workflows"
+          node scripts/rename-to-cascade.mjs
+          rm -rf .github/workflows
+          cp -a "$RUNNER_TEMP/cascade-workflows" .github/workflows
       - name: Commit generated tree
         shell: bash
         run: |
           set -euo pipefail
           rm -f .rename-cascade
-          rm -f .github/workflows/rename-cascade.yml
-          rm -f .github/workflows/rename-cascade-pr.yml
           rm -f scripts/rename-to-cascade.mjs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

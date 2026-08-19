@@ -1,0 +1,61 @@
+name: Verify native TUI release
+
+on:
+  push:
+    branches:
+      - agent/native-pi-tui-parity
+    paths:
+      - .verify-native-tui-release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-native-tui-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Wait for clean validated merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            git fetch origin main --quiet
+            VERSION="$(git show origin/main:package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
+            if [[ "$VERSION" == "0.3.0" ]]; then
+              git checkout --detach origin/main
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Cascade 0.3.0 was not merged to main within the verification window" >&2
+          exit 1
+      - name: Validate exact merged source
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run ci
+      - name: Create verified release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin refs/tags/v0.3.0 >/dev/null 2>&1; then
+            echo "v0.3.0 already exists"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a v0.3.0 -m "Cascade 0.3.0: native Pi parity and TUI setup"
+            git push origin v0.3.0
+          fi

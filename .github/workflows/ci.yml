@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22.19.0
+          - os: ubuntu-latest
+            node: 24
+          - os: macos-latest
+            node: 22.19.0
+          - os: windows-latest
+            node: 22.19.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          registry-url: https://registry.npmjs.org
+      - name: Materialize verified source when needed
+        shell: bash
+        run: |
+          if [[ -f .bootstrap/materialize.mjs ]]; then
+            node .bootstrap/materialize.mjs
+          fi
+      - name: Install pinned runtime dependency
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test, static checks, legal checks, and package smoke tests
+        run: npm run ci
+
+  github-source-install:
+    name: Install exact pushed commit from GitHub
+    if: github.event_name == 'push'
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Install and verify current commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/pi-cascade-prefix"
+          npm install -g "git+https://github.com/${GITHUB_REPOSITORY}.git#${GITHUB_SHA}" \
+            --prefix "$PREFIX" --no-audit --no-fund
+          "$PREFIX/bin/pi-cascade" --version
+          "$PREFIX/bin/pi-cascade" self-test
+          "$PREFIX/bin/pi-cascade" runtime

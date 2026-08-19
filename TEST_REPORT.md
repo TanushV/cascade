@@ -6,7 +6,7 @@ Prepared on 2026-08-18.
 
 | Check | Result |
 |---|---:|
-| Automated tests | **44 passed, 0 failed** |
+| Automated tests | **45 passed, 0 failed** |
 | Static syntax/import checks | **42 JavaScript modules passed** |
 | Legal and attribution checks | **Passed** |
 | Package smoke tests | **Passed** |
@@ -21,6 +21,7 @@ Prepared on 2026-08-18.
 | Real temporary Git worktree verification | Passed |
 | Protocol-faithful expert subprocess | Passed |
 | Source-tree overlay application | Passed |
+| Cross-platform JavaScript entrypoint launch | Passed |
 | Pi license attribution and version consistency | Passed |
 
 ## Covered behavior
@@ -29,6 +30,7 @@ The automated suite covers:
 
 - standalone runtime resolution and external-runtime override;
 - exact Node.js minimum-version comparison;
+- cross-platform JavaScript entrypoint launch through Node;
 - single-model and dual-model configuration;
 - independent worker and expert provider, model, thinking, tools, instructions, timeout, output, and cost overrides;
 - exact expert subprocess arguments and fail-closed execution;
@@ -56,7 +58,7 @@ The repository includes:
 - Dependabot for npm and GitHub Actions;
 - tag-driven release artifact generation and GitHub Release publishing.
 
-The GitHub-source bootstrap reconstructs an exact locally tested archive and verifies SHA-256 `2ea552b01521022c9972b93ad6b2c889b91dbe4f9c64589e0051eb38a57e4c95` before materialization.
+The GitHub-source bootstrap reconstructs an exact locally tested archive and verifies SHA-256 `2ea552b01521022c9972b93ad6b2c889b91dbe4f9c64589e0051eb38a57e4c95` before materialization. Small fixes discovered by cross-platform CI are stored as ordinary, reviewable files in `.bootstrap/overlays/` and applied deterministically after the verified base tree.
 
 ## Validation boundaries
 

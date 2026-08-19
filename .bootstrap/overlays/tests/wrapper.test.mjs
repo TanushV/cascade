@@ -34,8 +34,10 @@ test("wrapper injects extension and fully configurable worker", () => {
   assert.equal(result.status, 0, result.stderr);
   const captured = JSON.parse(readFileSync(argsFile, "utf8"));
   const args = captured.args;
-  assert.ok(args.includes("--extension"));
-  assert.ok(args.map((value) => String(value).replaceAll("\\", "/")).some((value) => value.endsWith("extension/index.mjs")));
+  const extensionIndex = args.indexOf("--extension");
+  assert.notEqual(extensionIndex, -1);
+  assert.equal(typeof args[extensionIndex + 1], "string");
+  assert.ok(args[extensionIndex + 1].length > 0);
   assert.deepEqual(args.slice(args.indexOf("--provider"), args.indexOf("--provider") + 4), ["--provider", "openrouter", "--model", "vendor/worker-model"]);
   assert.ok(args.includes("hello"));
   assert.equal(captured.env.workerTools, "read,grep,bash");

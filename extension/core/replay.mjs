@@ -29,7 +29,7 @@ function copyWorkspace(source, target) {
     dereference: false,
     filter(path) {
       const name = path.split(/[\\/]/).pop();
-      return name !== ".git" && name !== ".pi-cascade-replay";
+      return name !== ".git" && name !== ".cascade-replay";
     }
   });
 }
@@ -126,7 +126,7 @@ export async function runHarnessReplay({
     throw new Error("Automatic replay currently supports prompt and memory candidates; executable harness changes require a built candidate branch");
   }
 
-  const temporaryRoot = mkdtempSync(join(tmpdir(), "pi-cascade-replay-"));
+  const temporaryRoot = mkdtempSync(join(tmpdir(), "cascade-replay-"));
   const configPath = join(temporaryRoot, "cascade.json");
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   let baselineIsolation;
@@ -140,16 +140,16 @@ export async function runHarnessReplay({
       : createDirectManifest(manifestPath, temporaryRoot, "candidate");
     const commonEnv = {
       ...baseEnv,
-      PI_CASCADE_CONFIG: configPath,
-      PI_CASCADE_PROJECT_TRUSTED: "1",
-      PI_CASCADE_HARNESS_MODE: "observe"
+      CASCADE_CONFIG: configPath,
+      CASCADE_PROJECT_TRUSTED: "1",
+      CASCADE_HARNESS_MODE: "observe"
     };
     const baseline = await runEvaluation({
       manifestPath: baselineIsolation.path,
       executable,
       packageRoot,
       baseEnv: commonEnv,
-      extraEnv: { PI_CASCADE_CANARY_IDS: "" },
+      extraEnv: { CASCADE_CANARY_IDS: "" },
       label: `baseline:${candidateId}`
     });
     const canary = await runEvaluation({
@@ -157,7 +157,7 @@ export async function runHarnessReplay({
       executable,
       packageRoot,
       baseEnv: commonEnv,
-      extraEnv: { PI_CASCADE_CANARY_IDS: candidateId },
+      extraEnv: { CASCADE_CANARY_IDS: candidateId },
       label: `candidate:${candidateId}`
     });
     const metrics = {

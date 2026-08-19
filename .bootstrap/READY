@@ -1,3 +1,0 @@
-archive=source.tar.gz
-sha256=2ea552b01521022c9972b93ad6b2c889b91dbe4f9c64589e0051eb38a57e4c95
-trigger=materialize-after-pr-5

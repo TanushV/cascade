@@ -8,7 +8,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const upstream = JSON.parse(readFileSync(resolve(packageRoot, "UPSTREAM.json"), "utf8"));
 
 function parse(argv) {
-  const result = { target: "./pi-cascade-fork", branch: "pi-cascade" };
+  const result = { target: "./cascade-fork", branch: "cascade" };
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];

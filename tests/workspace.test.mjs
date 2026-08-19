@@ -22,7 +22,7 @@ test("programmatic workspace refuses implicit unsandboxed execution", async () =
 test("programmatic workspace persists bounded JSON state when explicitly allowed", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "cascade-workspace-state-"));
   const state = mkdtempSync(join(tmpdir(), "cascade-workspace-root-"));
-  process.env.PI_CASCADE_STATE_DIR = state;
+  process.env.CASCADE_STATE_DIR = state;
   const config = deepClone(DEFAULT_CONFIG);
   config.workspaceRuntime.enabled = true;
   config.workspaceRuntime.sandboxCommand = [];
@@ -35,7 +35,7 @@ test("programmatic workspace persists bounded JSON state when explicitly allowed
   assert.equal(second.result, 2);
   assert.equal(reset.result, 1);
   assert.equal(first.sandboxed, false);
-  delete process.env.PI_CASCADE_STATE_DIR;
+  delete process.env.CASCADE_STATE_DIR;
 });
 
 test("programmatic workspace reports timeouts explicitly", async () => {

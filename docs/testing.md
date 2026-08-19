@@ -36,19 +36,19 @@ The build environment has no provider credentials and no direct network access. 
 Run the live probes after configuring credentials:
 
 ```bash
-pi-cascade doctor --approve
-pi-cascade probe worker --approve
-pi-cascade probe expert --approve
+cascade doctor --approve
+cascade probe worker --approve
+cascade probe expert --approve
 ```
 
 A probe verifies authentication, exact model selection, streaming completion, tool execution, usage reporting, and Pi's provider adapter path. It consumes a small amount of provider quota.
 
 ## Evaluation manifests
 
-`pi-cascade eval` executes each task in Pi JSON mode and then runs deterministic checks.
+`cascade eval` executes each task in Pi JSON mode and then runs deterministic checks.
 
 ```bash
-pi-cascade eval examples/eval-manifest.json --output eval-report.json
+cascade eval examples/eval-manifest.json --output eval-report.json
 ```
 
 Harness replay executes the same manifest under baseline and canary harness states. Isolation is enabled by default. `--no-isolation` is available for controlled disposable workspaces and may contaminate state between runs.

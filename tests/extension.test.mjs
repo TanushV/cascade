@@ -56,8 +56,8 @@ test("extension initializes single-model worker and records route evidence", asy
     worker: { provider: "openrouter", model: "worker-model", thinking: "low", tools: ["read", "bash", "edit"] },
     privacy: { classification: "internal", allowContributor: false }
   }));
-  process.env.PI_CASCADE_CONFIG = configPath;
-  process.env.PI_CASCADE_STATE_DIR = statePath;
+  process.env.CASCADE_CONFIG = configPath;
+  process.env.CASCADE_STATE_DIR = statePath;
   const ctx = {
     cwd: dir,
     model: undefined,
@@ -78,14 +78,14 @@ test("extension initializes single-model worker and records route evidence", asy
   const input = await emit(mock, "input", { text: "fix the bug", source: "interactive" }, ctx);
   assert.deepEqual(input, { action: "continue" });
   const before = await emit(mock, "before_agent_start", { systemPrompt: "BASE" }, ctx);
-  assert.match(before.systemPrompt, /Pi Cascade runtime/);
+  assert.match(before.systemPrompt, /Cascade runtime/);
   await emit(mock, "turn_start", { turnIndex: 1 }, ctx);
   await emit(mock, "tool_call", { toolName: "bash", input: { command: "npm test" }, toolCallId: "1" }, ctx);
   await emit(mock, "tool_result", { toolName: "bash", input: { command: "npm test" }, content: [{ type: "text", text: "tests failed" }], isError: true, details: { exitCode: 1 }, toolCallId: "1" }, ctx);
   const route = await mock.tools.get("cascade_route").execute("x", { refreshRepository: false }, undefined, undefined, ctx);
   assert.match(route.content[0].text, /toolError/);
-  assert.ok(mock.statuses.get("pi-cascade").includes("cascade:single"));
+  assert.ok(mock.statuses.get("cascade").includes("cascade:single"));
 
-  delete process.env.PI_CASCADE_CONFIG;
-  delete process.env.PI_CASCADE_STATE_DIR;
+  delete process.env.CASCADE_CONFIG;
+  delete process.env.CASCADE_STATE_DIR;
 });

@@ -98,11 +98,11 @@ function positiveNumberFlag(value, name) {
 function configPathFromFlags(pi) {
   const value = pi.getFlag?.("cascade-config");
   if (typeof value === "string" && value.trim()) return value.trim();
-  return process.env.PI_CASCADE_CONFIG || undefined;
+  return process.env.CASCADE_CONFIG || undefined;
 }
 
 function projectTrustedFromEnvironment() {
-  return ["1", "true", "yes", "on"].includes(String(process.env.PI_CASCADE_PROJECT_TRUSTED || "").toLowerCase());
+  return ["1", "true", "yes", "on"].includes(String(process.env.CASCADE_PROJECT_TRUSTED || "").toLowerCase());
 }
 
 function describeModel(modelConfig) {
@@ -133,7 +133,7 @@ function buildSystemAppendix({ config, router, harness, currentRole, contributor
   const route = router.snapshot();
   const harnessOverlay = harness.promptOverlay();
   const lines = [
-    "# Pi Cascade runtime",
+    "# Cascade runtime",
     "",
     `Mode: ${config.mode}. Active role: ${currentRole}. Active profile: ${describeModel(role)}.`,
     `Current route state: ${route.level} (score ${route.score}).`,
@@ -171,8 +171,8 @@ function buildSystemAppendix({ config, router, harness, currentRole, contributor
 }
 
 export default function cascadeExtension(pi) {
-  pi.registerFlag("cascade-config", { description: "Path to a Pi Cascade JSON configuration", type: "string" });
-  pi.registerFlag("cascade-mode", { description: "Pi Cascade mode: single or dual", type: "string" });
+  pi.registerFlag("cascade-config", { description: "Path to a Cascade JSON configuration", type: "string" });
+  pi.registerFlag("cascade-mode", { description: "Cascade mode: single or dual", type: "string" });
   pi.registerFlag("cascade-worker", { description: "Worker provider/model", type: "string" });
   pi.registerFlag("cascade-expert", { description: "Expert provider/model", type: "string" });
   pi.registerFlag("cascade-worker-thinking", { description: "Worker thinking level", type: "string" });
@@ -190,7 +190,7 @@ export default function cascadeExtension(pi) {
   let ledger;
   let router;
   let harness;
-  let currentRole = process.env.PI_CASCADE_CHILD === "1" ? "expert" : "worker";
+  let currentRole = process.env.CASCADE_CHILD === "1" ? "expert" : "worker";
   let blockedReason = "";
   let initialized = false;
   let expertInFlight = false;
@@ -242,14 +242,14 @@ export default function cascadeExtension(pi) {
 
   try {
     loadConfig(process.cwd(), projectTrustedFromEnvironment());
-    registerConfiguredProviders(pi, config, { onWarning: (message) => console.error(`[pi-cascade] ${message}`) });
+    registerConfiguredProviders(pi, config, { onWarning: (message) => console.error(`[cascade] ${message}`) });
   } catch (error) {
-    console.error(`[pi-cascade] preliminary configuration failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`[cascade] preliminary configuration failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   function updateStatus(ctx = activeCtx) {
     if (!ctx || !config.ui.showStatus) return;
-    ctx.ui.setStatus("pi-cascade", formatStatus({ config, ledger, router, currentRole, blockedReason, harness }));
+    ctx.ui.setStatus("cascade", formatStatus({ config, ledger, router, currentRole, blockedReason, harness }));
   }
 
   function notify(ctx, message, type = "info") {
@@ -302,7 +302,7 @@ ${state.stagedStat || ""}`, 24),
     pi.setActiveTools([...new Set(desired)].filter((name) => available.has(name)));
     currentRole = role;
     blockedReason = "";
-    if (!quiet) notify(ctx, `Pi Cascade active role: ${role} (${describeModel(target)})`, "info");
+    if (!quiet) notify(ctx, `Cascade active role: ${role} (${describeModel(target)})`, "info");
     updateStatus(ctx);
   }
 
@@ -330,7 +330,7 @@ ${state.stagedStat || ""}`, 24),
     for (const warning of result.validation.warnings) notify(ctx, warning, "warning");
     if (result.validation.errors.length) {
       blockedReason = result.validation.errors.join("; ");
-      notify(ctx, `Pi Cascade configuration errors: ${blockedReason}`, "error");
+      notify(ctx, `Cascade configuration errors: ${blockedReason}`, "error");
     }
     updateStatus(ctx);
   }
@@ -361,7 +361,7 @@ ${state.stagedStat || ""}`, 24),
 
   async function performExpert({ question, mode = "consult", ctx, forced = false }) {
     ensureInitialized(ctx);
-    if (config.mode !== "dual") throw new Error("Pi Cascade is in single-model mode");
+    if (config.mode !== "dual") throw new Error("Cascade is in single-model mode");
     if (mode === "takeover" && !forced && !config.routing.allowModelInitiatedTakeover) {
       throw new Error("Model-initiated expert takeover is disabled; use /cascade-takeover or enable routing.allowModelInitiatedTakeover");
     }
@@ -403,7 +403,7 @@ ${state.stagedStat || ""}`, 24),
           ledger.record("expert_workspace_change", { beforeDiff, afterDiff }, { status: "verified" });
         }
       }
-      pi.appendEntry("pi-cascade.expert", {
+      pi.appendEntry("cascade.expert", {
         mode,
         question: config.privacy.redactSecrets ? redactSecrets(question) : question,
         result: result.parsed,
@@ -483,7 +483,7 @@ ${state.stagedStat || ""}`, 24),
       }, { status: "verified", summary: `Checkpoint: ${params.next}` });
       router.markProgress(`checkpoint ${entry.id}`);
       ledger.record("router_state", router.snapshot(), { status: "verified", summary: "Router state checkpointed" });
-      pi.appendEntry("pi-cascade.checkpoint", { id: entry.id, ...entry.data });
+      pi.appendEntry("cascade.checkpoint", { id: entry.id, ...entry.data });
       updateStatus(ctx);
       return textResult(`Checkpoint ${entry.id} recorded. Next: ${params.next}`, entry);
     }
@@ -552,7 +552,7 @@ ${state.stagedStat || ""}`, 24),
           createdBy: `${currentRole}:${describeModel(currentRole === "worker" ? config.worker : config.expert)}`
         });
         ledger.record("harness_candidate", candidate, { status: "unverified", summary: `Harness candidate ${candidate.id}: ${candidate.summary}` });
-        pi.appendEntry("pi-cascade.harness-candidate", candidate);
+        pi.appendEntry("cascade.harness-candidate", candidate);
         let disposition = "inactive until evaluated and promoted";
         const lowRisk = candidate.edits.every((edit) => ["prompt", "memory"].includes(edit.kind));
         if (config.harnessLearning.mode === "canary" && lowRisk) {
@@ -577,13 +577,13 @@ ${state.stagedStat || ""}`, 24),
 
   pi.on("session_start", async (_event, ctx) => {
     initialize(ctx);
-    if (process.env.PI_CASCADE_CHILD === "1") return;
+    if (process.env.CASCADE_CHILD === "1") return;
     if (!blockedReason) {
       try {
         await activateRole("worker", ctx, { quiet: true });
       } catch (error) {
         blockedReason = error instanceof Error ? error.message : String(error);
-        notify(ctx, `Pi Cascade could not activate worker: ${blockedReason}`, "error");
+        notify(ctx, `Cascade could not activate worker: ${blockedReason}`, "error");
       }
     }
     updateStatus(ctx);
@@ -595,21 +595,21 @@ ${state.stagedStat || ""}`, 24),
     const policy = policyFor(target);
     if (!policy.allowed) {
       blockedReason = policy.reason;
-      notify(ctx, `Pi Cascade blocked this prompt: ${policy.reason}`, "error");
+      notify(ctx, `Cascade blocked this prompt: ${policy.reason}`, "error");
       updateStatus(ctx);
       return { action: "handled" };
     }
     const budget = sessionBudget();
     if (!budget.allowed) {
       blockedReason = `session cost budget exhausted ($${budget.current.toFixed(4)} / $${budget.maximum.toFixed(4)})`;
-      notify(ctx, `Pi Cascade blocked this prompt: ${blockedReason}`, "error");
+      notify(ctx, `Cascade blocked this prompt: ${blockedReason}`, "error");
       updateStatus(ctx);
       return { action: "handled" };
     }
     if (policy.contributor && Array.isArray(event.images) && event.images.length > 0 && !config.privacy.allowImagesToContributor) {
       const reason = "contributor endpoint image input is disabled by privacy.allowImagesToContributor";
       ledger.record("privacy_block", { source: "input", reason, imageCount: event.images.length }, { status: "verified" });
-      notify(ctx, `Pi Cascade blocked this prompt: ${reason}`, "error");
+      notify(ctx, `Cascade blocked this prompt: ${reason}`, "error");
       return { action: "handled" };
     }
     const original = String(event.text || "");
@@ -620,7 +620,7 @@ ${state.stagedStat || ""}`, 24),
         status: "verified",
         summary: "Credential-like text was redacted before contributor inference"
       });
-      notify(ctx, "Pi Cascade redacted credential-like text before sending the prompt to the contributor endpoint.", "warning");
+      notify(ctx, "Cascade redacted credential-like text before sending the prompt to the contributor endpoint.", "warning");
       return { action: "transform", text: safeText, images: event.images };
     }
     return { action: "continue" };
@@ -640,7 +640,7 @@ ${state.stagedStat || ""}`, 24),
     if (!budget.allowed) {
       blockedReason = `session cost budget exhausted ($${budget.current.toFixed(4)} / $${budget.maximum.toFixed(4)})`;
       ledger.record("budget_stop", budget, { status: "verified", summary: blockedReason });
-      notify(ctx, `Pi Cascade stopped the turn: ${blockedReason}`, "error");
+      notify(ctx, `Cascade stopped the turn: ${blockedReason}`, "error");
       ctx.abort?.();
       updateStatus(ctx);
       return;
@@ -654,7 +654,7 @@ ${state.stagedStat || ""}`, 24),
     ensureInitialized(ctx);
     const budget = sessionBudget();
     if (!budget.allowed) {
-      const reason = `Pi Cascade session cost budget exhausted ($${budget.current.toFixed(4)} / $${budget.maximum.toFixed(4)})`;
+      const reason = `Cascade session cost budget exhausted ($${budget.current.toFixed(4)} / $${budget.maximum.toFixed(4)})`;
       ledger.record("budget_stop", { ...budget, toolName: event.toolName }, { status: "verified", summary: reason });
       return { block: true, terminate: true, reason };
     }
@@ -698,7 +698,7 @@ ${state.stagedStat || ""}`, 24),
     if (router.shouldInjectRecommendation()) {
       const recommendation = router.recommendation();
       pi.sendMessage({
-        customType: "pi-cascade.route",
+        customType: "cascade.route",
         content: [{ type: "text", text: recommendation }],
         display: false,
         details: router.snapshot()
@@ -721,14 +721,14 @@ ${state.stagedStat || ""}`, 24),
   pi.on("turn_end", async (_event, ctx) => {
     ensureInitialized(ctx);
     ledger.record("router_state", router.snapshot(), { status: "verified", summary: "Router state persisted at turn end" });
-    if (process.env.PI_CASCADE_CHILD === "1" || expertInFlight || ctx.hasPendingMessages?.()) return;
+    if (process.env.CASCADE_CHILD === "1" || expertInFlight || ctx.hasPendingMessages?.()) return;
     const automatic = router.shouldAutoConsult(ledger);
     if (!automatic.consult) return;
     const question = `Resolve the current escalation signals and name the single best next action. Signals: ${router.snapshot().signals.map((signal) => signal.reason).join("; ")}`;
     try {
       const result = await performExpert({ question, mode: "consult", ctx });
       pi.sendMessage({
-        customType: "pi-cascade.expert-auto",
+        customType: "cascade.expert-auto",
         content: [{ type: "text", text: `Automatic expert consultation:\n${JSON.stringify(result.parsed, null, 2)}` }],
         display: true,
         details: result
@@ -743,7 +743,7 @@ ${state.stagedStat || ""}`, 24),
   pi.on("agent_settled", async (_event, ctx) => {
     ensureInitialized(ctx);
     if (
-      process.env.PI_CASCADE_CHILD === "1" ||
+      process.env.CASCADE_CHILD === "1" ||
       !config.verification.requireBeforeCompletion ||
       completionGateInFlight ||
       expertInFlight ||
@@ -765,13 +765,13 @@ ${state.stagedStat || ""}`, 24),
       return;
     }
     if (completionGateRuns >= Number(config.verification.maxCompletionGateRuns || 1)) {
-      notify(ctx, "Pi Cascade completion gate remains unresolved after the configured retry limit.", "error");
+      notify(ctx, "Cascade completion gate remains unresolved after the configured retry limit.", "error");
       return;
     }
     completionGateRuns += 1;
     if (!config.verification.autoRunBeforeCompletion) {
       pi.sendMessage({
-        customType: "pi-cascade.completion-gate",
+        customType: "cascade.completion-gate",
         content: [{ type: "text", text: `Workspace changes are not verified for the current diff. Run /cascade-verify before declaring completion.
 ${formatVerificationPlan(plan)}` }],
         display: true,
@@ -793,7 +793,7 @@ ${formatVerificationPlan(plan)}` }],
       } else {
         router.addSignal("verifierFailure", config.routing.weights.verifierFailure, "completion verification failed");
         pi.sendMessage({
-          customType: "pi-cascade.completion-gate",
+          customType: "cascade.completion-gate",
           content: [{ type: "text", text: `Completion verification failed. Repair the failure before declaring completion.
 
 ${summarizeVerificationReport(report)}` }],
@@ -823,7 +823,7 @@ ${summarizeVerificationReport(report)}` }],
     });
     const instructions = [
       event.customInstructions || "",
-      "Preserve the Pi Cascade continuation state in the summary.",
+      "Preserve the Cascade continuation state in the summary.",
       "Include: the exact user goal and constraints; verified facts and their evidence; unresolved questions; falsified hypotheses and failed approaches; current diff and verification status; one concrete next action; the active worker/expert profiles; route signals; and the harness manifest hash.",
       `Cascade checkpoint: ${JSON.stringify(checkpoint)}`
     ].filter(Boolean).join("\n\n");
@@ -844,14 +844,14 @@ ${summarizeVerificationReport(report)}` }],
   });
 
   pi.registerCommand("cascade", {
-    description: "Show or reload Pi Cascade status",
+    description: "Show or reload Cascade status",
     async handler(args, ctx) {
       ensureInitialized(ctx);
       const [action] = parseWords(args);
       if (action === "reload") {
         initialize(ctx);
         await activateRole(currentRole === "expert" && config.mode === "dual" ? "expert" : "worker", ctx, { quiet: true });
-        notify(ctx, "Pi Cascade configuration reloaded", "info");
+        notify(ctx, "Cascade configuration reloaded", "info");
       }
       const report = {
         version: PACKAGE_VERSION,
@@ -876,7 +876,7 @@ ${summarizeVerificationReport(report)}` }],
   });
 
   pi.registerCommand("cascade-mode", {
-    description: "Switch Pi Cascade between single and dual mode",
+    description: "Switch Cascade between single and dual mode",
     async handler(args, ctx) {
       ensureInitialized(ctx);
       const [mode] = parseWords(args);
@@ -885,7 +885,7 @@ ${summarizeVerificationReport(report)}` }],
       config.mode = mode;
       if (mode === "single" && currentRole === "expert") await activateRole("worker", ctx);
       updateStatus(ctx);
-      notify(ctx, `Pi Cascade mode changed for this session to ${mode}`, "info");
+      notify(ctx, `Cascade mode changed for this session to ${mode}`, "info");
     }
   });
 
@@ -909,7 +909,7 @@ ${summarizeVerificationReport(report)}` }],
       try {
         const result = await performExpert({ question, mode: "consult", ctx, forced: true });
         pi.sendMessage({
-          customType: "pi-cascade.expert-manual",
+          customType: "cascade.expert-manual",
           content: [{ type: "text", text: JSON.stringify(result.parsed, null, 2) }],
           display: true,
           details: result
@@ -928,7 +928,7 @@ ${summarizeVerificationReport(report)}` }],
       try {
         const result = await performExpert({ question, mode: "takeover", ctx, forced: true });
         pi.sendMessage({
-          customType: "pi-cascade.expert-takeover",
+          customType: "cascade.expert-takeover",
           content: [{ type: "text", text: JSON.stringify(result.parsed, null, 2) }],
           display: true,
           details: result

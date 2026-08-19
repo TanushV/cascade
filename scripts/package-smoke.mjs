@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
 const packageVersion = packageJson.version;
-const temporary = mkdtempSync(join(tmpdir(), "pi-cascade-smoke-"));
+const temporary = mkdtempSync(join(tmpdir(), "cascade-smoke-"));
 const packDir = join(temporary, "pack");
 const installDir = join(temporary, "install");
 const fakePiDir = join(temporary, "fake-pi");
@@ -22,15 +22,26 @@ mkdirSync(globalPrefix, { recursive: true });
 mkdirSync(gitPrefix, { recursive: true });
 
 function run(executable, args, options = {}) {
+  const needsShell = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
   return execFileSync(executable, args, {
     encoding: "utf8",
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    ...options
+    ...options,
+    shell: options.shell ?? needsShell
+  });
+}
+
+function runNpm(args, options = {}) {
+  const npmCli = process.env.npm_execpath;
+  if (npmCli) return run(process.execPath, [npmCli, ...args], options);
+  return run(process.platform === "win32" ? "npm.cmd" : "npm", args, {
+    ...options,
+    shell: process.platform === "win32",
   });
 }
 
 function pack(cwd) {
-  const raw = run("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", packDir], {
+  const raw = runNpm(["pack", "--json", "--ignore-scripts", "--pack-destination", packDir], {
     cwd,
     capture: true
   });
@@ -55,7 +66,7 @@ try {
     files: ["dist"]
   }, null, 2)}\n`);
   writeFileSync(join(fakePiDir, "dist", "index.js"), "export const smokeRuntime = true;\n");
-  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst args = process.argv.slice(2);\nif (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }\nif (process.env.PI_CASCADE_SMOKE_ARGS) writeFileSync(process.env.PI_CASCADE_SMOKE_ARGS, JSON.stringify(args));\nconsole.log("pi smoke runtime");\n`);
+  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst args = process.argv.slice(2);\nif (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }\nif (process.env.CASCADE_SMOKE_ARGS) writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify(args));\nconsole.log("pi smoke runtime");\n`);
   chmodSync(join(fakePiDir, "dist", "cli.js"), 0o755);
 
   cpSync(packageRoot, gitSource, {
@@ -68,7 +79,7 @@ try {
   });
   run("git", ["init", "-q", "-b", "main"], { cwd: gitSource });
   run("git", ["config", "user.email", "smoke@example.com"], { cwd: gitSource });
-  run("git", ["config", "user.name", "Pi Cascade Smoke"], { cwd: gitSource });
+  run("git", ["config", "user.name", "Cascade Smoke"], { cwd: gitSource });
   run("git", ["add", "."], { cwd: gitSource });
   run("git", ["commit", "-qm", "smoke source"], { cwd: gitSource });
 
@@ -138,7 +149,7 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
 
   try {
     writeFileSync(join(installDir, "package.json"), `${JSON.stringify({ private: true }, null, 2)}\n`);
-    run("npm", [
+    runNpm([
       "install",
       "--ignore-scripts",
       "--no-audit",
@@ -147,7 +158,7 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
       "--registry", registryUrl,
       cascadeTarball
     ], { cwd: installDir });
-    run("npm", [
+    runNpm([
       "install",
       "-g",
       "--prefix", globalPrefix,
@@ -158,7 +169,7 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
       "--registry", registryUrl,
       cascadeTarball
     ], { cwd: installDir });
-    run("npm", [
+    runNpm([
       "install",
       "-g",
       "--prefix", gitPrefix,
@@ -173,46 +184,50 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
     registry.kill("SIGTERM");
   }
 
-  const installedRoot = join(installDir, "node_modules", "pi-cascade");
+  const installedRoot = join(installDir, "node_modules", "cascade");
   const installedPackage = JSON.parse(readFileSync(join(installedRoot, "package.json"), "utf8"));
-  if (installedPackage.name !== "pi-cascade") throw new Error("Installed package identity is incorrect");
+  if (installedPackage.name !== "cascade") throw new Error("Installed package identity is incorrect");
   if (installedPackage.dependencies?.["@earendil-works/pi-coding-agent"] !== "0.84.2") {
     throw new Error("Standalone Pi runtime dependency is missing or unpinned");
   }
 
-  const cli = join(installedRoot, "bin", "pi-cascade.mjs");
+  const cli = join(installedRoot, "bin", "cascade.mjs");
   const help = run(process.execPath, [cli, "--help"], { cwd: installDir, capture: true });
-  if (!help.includes("Pi Cascade") || !help.includes("--worker-tools")) {
+  if (!help.includes("Cascade") || !help.includes("--worker-tools")) {
     throw new Error("Installed CLI help is incomplete");
   }
 
   const version = run(process.execPath, [cli, "--version"], { cwd: installDir, capture: true });
-  if (!version.includes(`pi-cascade ${packageVersion}`) || !version.includes("0.84.2-smoke")) {
+  if (!version.includes(`cascade ${packageVersion}`) || !version.includes("0.84.2-smoke")) {
     throw new Error(`Installed standalone runtime was not resolved: ${version}`);
   }
 
   const selfTest = run(process.execPath, [cli, "self-test"], { cwd: installDir, capture: true });
-  if (!selfTest.includes("Pi Cascade self-test passed")) {
+  if (!selfTest.includes("Cascade self-test passed")) {
     throw new Error(`Installed self-test failed: ${selfTest}`);
   }
 
-  const globalCli = join(globalPrefix, "bin", process.platform === "win32" ? "pi-cascade.cmd" : "pi-cascade");
+  const globalCli = process.platform === "win32"
+  ? join(globalPrefix, "cascade.cmd")
+  : join(globalPrefix, "bin", "cascade");
   const globalVersion = run(globalCli, ["--version"], { cwd: installDir, capture: true });
-  if (!globalVersion.includes(`pi-cascade ${packageVersion}`) || !globalVersion.includes("0.84.2-smoke")) {
+  if (!globalVersion.includes(`cascade ${packageVersion}`) || !globalVersion.includes("0.84.2-smoke")) {
     throw new Error(`Global standalone installation did not resolve its runtime: ${globalVersion}`);
   }
   const globalSelfTest = run(globalCli, ["self-test"], { cwd: installDir, capture: true });
-  if (!globalSelfTest.includes("Pi Cascade self-test passed")) {
+  if (!globalSelfTest.includes("Cascade self-test passed")) {
     throw new Error(`Global standalone self-test failed: ${globalSelfTest}`);
   }
 
-  const gitCli = join(gitPrefix, "bin", process.platform === "win32" ? "pi-cascade.cmd" : "pi-cascade");
+  const gitCli = process.platform === "win32"
+  ? join(gitPrefix, "cascade.cmd")
+  : join(gitPrefix, "bin", "cascade");
   const gitVersion = run(gitCli, ["--version"], { cwd: installDir, capture: true });
-  if (!gitVersion.includes(`pi-cascade ${packageVersion}`) || !gitVersion.includes("0.84.2-smoke")) {
+  if (!gitVersion.includes(`cascade ${packageVersion}`) || !gitVersion.includes("0.84.2-smoke")) {
     throw new Error(`Git-source installation did not resolve its runtime: ${gitVersion}`);
   }
   const gitSelfTest = run(gitCli, ["self-test"], { cwd: installDir, capture: true });
-  if (!gitSelfTest.includes("Pi Cascade self-test passed")) {
+  if (!gitSelfTest.includes("Cascade self-test passed")) {
     throw new Error(`Git-source standalone self-test failed: ${gitSelfTest}`);
   }
 
@@ -227,7 +242,7 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
   ], {
     cwd: installDir,
     capture: true,
-    env: { ...process.env, PI_CASCADE_SMOKE_ARGS: argsPath, PI_CASCADE_STATE_DIR: join(temporary, "state") }
+    env: { ...process.env, CASCADE_SMOKE_ARGS: argsPath, CASCADE_STATE_DIR: join(temporary, "state") }
   });
   const spawnedArgs = JSON.parse(readFileSync(argsPath, "utf8"));
   if (!spawnedArgs.includes("--extension") || !spawnedArgs.includes("vendor/smoke-worker")) {
@@ -236,6 +251,6 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
 
   console.log(`Standalone package and Git-source smoke tests passed: ${cascadeTarball}`);
 } finally {
-  if (process.env.PI_CASCADE_SMOKE_KEEP !== "1") rmSync(temporary, { recursive: true, force: true });
+  if (process.env.CASCADE_SMOKE_KEEP !== "1") rmSync(temporary, { recursive: true, force: true });
   else console.log(`Smoke workspace retained at ${temporary}`);
 }

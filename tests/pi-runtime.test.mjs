@@ -18,7 +18,7 @@ function fakeRuntime() {
 
 test("automatic runtime resolves the packaged Pi dependency path", () => {
   const { cli } = fakeRuntime();
-  const runtime = resolvePiRuntime({ piBinary: "auto" }, { env: { ...process.env, PI_CASCADE_INTERNAL_PI_CLI: cli } });
+  const runtime = resolvePiRuntime({ piBinary: "auto" }, { env: { ...process.env, CASCADE_INTERNAL_PI_CLI: cli } });
   assert.equal(runtime.source, "internal-override");
   assert.equal(runtime.version, "0.84.2");
   assert.equal(runtime.command, process.execPath);
@@ -27,7 +27,7 @@ test("automatic runtime resolves the packaged Pi dependency path", () => {
 
 test("runtime health check executes the resolved CLI", () => {
   const { cli } = fakeRuntime();
-  const result = checkPiRuntime({ piBinary: "auto" }, { env: { ...process.env, PI_CASCADE_INTERNAL_PI_CLI: cli } });
+  const result = checkPiRuntime({ piBinary: "auto" }, { env: { ...process.env, CASCADE_INTERNAL_PI_CLI: cli } });
   assert.equal(result.ok, true);
   assert.match(result.stdout, /0\.84\.2-test/);
 });

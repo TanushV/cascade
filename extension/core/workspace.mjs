@@ -6,9 +6,9 @@ import { atomicWriteJson, safeFileName, shortHash, truncateText } from "./util.m
 
 function workspaceStatePath({ cwd, config, sessionId }) {
   if (config.workspaceRuntime.statePath) return resolve(cwd, config.workspaceRuntime.statePath);
-  const root = process.env.PI_CASCADE_STATE_DIR
-    ? resolve(process.env.PI_CASCADE_STATE_DIR)
-    : join(homedir(), ".pi", "agent", "cascade");
+  const root = process.env.CASCADE_STATE_DIR
+    ? resolve(process.env.CASCADE_STATE_DIR)
+    : join(homedir(), ".local", "state", "cascade");
   return join(root, "workspaces", shortHash(resolve(cwd), 20), `${safeFileName(sessionId || "ephemeral", shortHash(sessionId || "ephemeral", 24))}.json`);
 }
 
@@ -54,7 +54,7 @@ export async function runProgrammaticWorkspace({ code, input = {}, reset = false
   }
   const statePath = workspaceStatePath({ cwd, config, sessionId });
   const state = reset ? {} : loadState(statePath);
-  const temporary = mkdtempSync(join(tmpdir(), "pi-cascade-workspace-"));
+  const temporary = mkdtempSync(join(tmpdir(), "cascade-workspace-"));
   const scriptPath = join(temporary, "run.py");
   writeFileSync(scriptPath, buildWrapper({ code: source, input, state }), { encoding: "utf8", mode: 0o600 });
   const command = commandFor(config, scriptPath, resolve(cwd));

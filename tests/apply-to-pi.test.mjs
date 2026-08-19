@@ -16,10 +16,10 @@ test("apply-to-pi creates a workspace package and minimal root scripts", () => {
   const result = spawnSync(process.execPath, [join(root, "scripts", "apply-to-pi.mjs"), "--pi-source", pi], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   const rootPackage = JSON.parse(readFileSync(join(pi, "package.json"), "utf8"));
-  assert.equal(rootPackage.scripts.cascade, "node packages/pi-cascade/bin/pi-cascade.mjs");
-  assert.equal(rootPackage.scripts["cascade:check"], "npm run check --workspace=pi-cascade");
-  assert.match(readFileSync(join(pi, "PI_CASCADE_UPSTREAM.json"), "utf8"), /59a71b/);
-  assert.match(readFileSync(join(pi, "packages", "pi-cascade", "README.md"), "utf8"), /Pi Cascade/);
-  assert.match(readFileSync(join(pi, "packages", "pi-cascade", "UPSTREAM.json"), "utf8"), /0.84.2/);
-  assert.ok(readFileSync(join(pi, "packages", "pi-cascade", "tests", "router.test.mjs"), "utf8").includes("repeated verifier failures"));
+  assert.equal(rootPackage.scripts.cascade, "node packages/cascade/bin/cascade.mjs");
+  assert.equal(rootPackage.scripts["cascade:check"], "npm run check --workspace=cascade");
+  assert.match(readFileSync(join(pi, "CASCADE_UPSTREAM.json"), "utf8"), /59a71b/);
+  assert.match(readFileSync(join(pi, "packages", "cascade", "README.md"), "utf8"), /Cascade/);
+  assert.match(readFileSync(join(pi, "packages", "cascade", "UPSTREAM.json"), "utf8"), /0.84.2/);
+  assert.ok(readFileSync(join(pi, "packages", "cascade", "tests", "router.test.mjs"), "utf8").includes("repeated verifier failures"));
 });

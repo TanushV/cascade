@@ -18,7 +18,7 @@ The Python wrapper exposes a deliberately narrow built-in set plus `json`, `math
 
 ## Sandbox requirement
 
-Pi Cascade refuses to enable the runtime unless either:
+Cascade refuses to enable the runtime unless either:
 
 - `workspaceRuntime.sandboxCommand` is configured; or
 - `workspaceRuntime.allowUnsandboxed` is explicitly true.
@@ -45,17 +45,17 @@ Placeholders:
 - `{script}`: generated temporary wrapper script;
 - `{cwd}`: repository working directory.
 
-The configured command is trusted code. Pi Cascade does not inspect whether it genuinely isolates filesystem, process, network, or credentials.
+The configured command is trusted code. Cascade does not inspect whether it genuinely isolates filesystem, process, network, or credentials.
 
 ## Persistence
 
 Default state location:
 
 ```text
-~/.pi/agent/cascade/workspaces/<repository-hash>/<session-id>.json
+~/.local/state/cascade/workspaces/<repository-hash>/<session-id>.json
 ```
 
-Set `workspaceRuntime.statePath` for a repository-relative override or `PI_CASCADE_STATE_DIR` for an alternate runtime-state root.
+Set `workspaceRuntime.statePath` for a repository-relative override or `CASCADE_STATE_DIR` for an alternate runtime-state root.
 
 ## Limits
 

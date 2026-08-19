@@ -32,7 +32,7 @@ function main() {
   }
   const codingAgent = JSON.parse(readFileSync(codingAgentPath, "utf8"));
   if (codingAgent.name !== "@earendil-works/pi-coding-agent") throw new Error("Unexpected Pi coding-agent package identity");
-  const target = join(options.piSource, "packages", "pi-cascade");
+  const target = join(options.piSource, "packages", "cascade");
   if (existsSync(target)) {
     if (!options.force) throw new Error(`Target already exists: ${target}. Use --force to replace it.`);
     rmSync(target, { recursive: true, force: true });
@@ -47,19 +47,19 @@ function main() {
   }
   const rootPackage = JSON.parse(readFileSync(rootPackagePath, "utf8"));
   rootPackage.scripts ||= {};
-  rootPackage.scripts.cascade = "node packages/pi-cascade/bin/pi-cascade.mjs";
-  rootPackage.scripts["cascade:test"] = "npm test --workspace=pi-cascade";
-  rootPackage.scripts["cascade:check"] = "npm run check --workspace=pi-cascade";
-  rootPackage.scripts["cascade:smoke"] = "npm run smoke --workspace=pi-cascade";
+  rootPackage.scripts.cascade = "node packages/cascade/bin/cascade.mjs";
+  rootPackage.scripts["cascade:test"] = "npm test --workspace=cascade";
+  rootPackage.scripts["cascade:check"] = "npm run check --workspace=cascade";
+  rootPackage.scripts["cascade:smoke"] = "npm run smoke --workspace=cascade";
   atomicWriteJson(rootPackagePath, rootPackage, 0o644);
-  atomicWriteJson(join(options.piSource, "PI_CASCADE_UPSTREAM.json"), {
+  atomicWriteJson(join(options.piSource, "CASCADE_UPSTREAM.json"), {
     ...UPSTREAM,
     expectedCodingAgentVersion: UPSTREAM.codingAgentVersion,
     detectedCodingAgentVersion: codingAgent.version,
     appliedAt: new Date().toISOString(),
     integration: "workspace package and supported Pi extension APIs"
   }, 0o644);
-  console.log(`Applied Pi Cascade to ${options.piSource}`);
+  console.log(`Applied Cascade to ${options.piSource}`);
   console.log("Run: npm install --ignore-scripts && npm run cascade -- --approve \"your task\"");
 }
 

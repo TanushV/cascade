@@ -3,8 +3,8 @@
 Configuration is merged in this order:
 
 1. built-in defaults;
-2. `~/.pi/agent/cascade.json`;
-3. trusted project `.pi/cascade.json`;
+2. `~/.config/cascade/config.json`;
+3. trusted project `.cascade/config.json`;
 4. an explicit `--cascade-config` file;
 5. environment and wrapper overrides.
 
@@ -34,15 +34,15 @@ Objects merge recursively. Arrays replace earlier arrays.
 
 ## Bundled Pi runtime
 
-`piBinary` defaults to `"auto"`. In that mode Pi Cascade resolves the pinned `@earendil-works/pi-coding-agent@0.84.2` dependency from its own installation and launches `dist/cli.js` with the current Node.js executable. A separately installed global `pi` command is not used or required.
+`piBinary` defaults to `"auto"`. In that mode Cascade resolves the pinned `@earendil-works/pi-coding-agent@0.84.2` dependency from its own installation and launches `dist/cli.js` with the current Node.js executable. A separately installed global `pi` command is not used or required.
 
-Set `piBinary` or `PI_CASCADE_PI_BIN` only for development, compatibility testing, or an intentionally external Pi build. The value may be an executable name on `PATH` or an absolute path.
+Set `piBinary` or `CASCADE_PI_BIN` only for development, compatibility testing, or an intentionally external Pi build. The value may be an executable name on `PATH` or an absolute path.
 
 Use these commands to inspect the resolved runtime:
 
 ```bash
-pi-cascade runtime
-pi-cascade self-test
+cascade runtime
+cascade self-test
 ```
 
 ## Worker and expert profiles
@@ -100,7 +100,7 @@ Consultation, review, and investigation automatically remove `edit` and `write` 
 
 The supported adapter names follow Pi's provider contract, including `openai-responses`, `openai-completions`, `anthropic-messages`, and `google-generative-ai`.
 
-The bundled `meta-model-api` profile is ordinary configuration and may be overridden. Run `pi-cascade probe worker` after changing its adapter, model ID, base URL, or headers.
+The bundled `meta-model-api` profile is ordinary configuration and may be overridden. Run `cascade probe worker` after changing its adapter, model ID, base URL, or headers.
 
 ## Routing
 
@@ -187,7 +187,7 @@ Valid classifications are `public`, `internal`, `confidential`, `regulated`, and
 }
 ```
 
-Persistent evidence lives under `~/.pi/agent/cascade/sessions/` unless `PI_CASCADE_STATE_DIR` is set.
+Persistent evidence lives under `~/.local/state/cascade/sessions/` unless `CASCADE_STATE_DIR` is set.
 
 ## Verification
 
@@ -258,33 +258,33 @@ A sandbox command is an argument array and may contain `{python}`, `{script}`, a
 
 | Variable | Meaning |
 |---|---|
-| `PI_CASCADE_CONFIG` | Explicit configuration file |
-| `PI_CASCADE_CONFIG_GLOBAL` | Override global configuration path |
-| `PI_CASCADE_CONFIG_PROJECT` | Override project configuration path |
-| `PI_CASCADE_MODE` | `single` or `dual` |
-| `PI_CASCADE_PI_BIN` | Advanced override for the bundled Pi runtime executable |
-| `PI_CASCADE_WORKER` | Worker `provider/model` |
-| `PI_CASCADE_EXPERT` | Expert `provider/model` |
-| `PI_CASCADE_WORKER_THINKING` | Worker thinking level |
-| `PI_CASCADE_EXPERT_THINKING` | Expert thinking level |
-| `PI_CASCADE_WORKER_TOOLS` | Comma list or JSON array |
-| `PI_CASCADE_EXPERT_TOOLS` | Comma list or JSON array |
-| `PI_CASCADE_WORKER_INSTRUCTIONS` | Worker overlay |
-| `PI_CASCADE_EXPERT_INSTRUCTIONS` | Expert overlay |
-| `PI_CASCADE_EXPERT_TIMEOUT_MS` | Expert timeout |
-| `PI_CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS` | Expert response bound |
-| `PI_CASCADE_MAX_EXPERT_CALLS` | Expert call ceiling |
-| `PI_CASCADE_MAX_EXPERT_COST_USD` | Expert cost ceiling |
-| `PI_CASCADE_MAX_SESSION_COST_USD` | Total estimated session cost ceiling |
-| `PI_CASCADE_ALLOW_CONTRIBUTOR` | Explicit Contributor consent |
-| `PI_CASCADE_CLASSIFICATION` | Repository classification |
-| `PI_CASCADE_AUTO_CONSULT` | Enable automatic consultations |
-| `PI_CASCADE_HARNESS_MODE` | Harness mode |
-| `PI_CASCADE_WORKSPACE` | Enable workspace runtime |
-| `PI_CASCADE_WORKSPACE_PYTHON` | Python executable |
-| `PI_CASCADE_WORKSPACE_SANDBOX_COMMAND` | Comma list or JSON array |
-| `PI_CASCADE_WORKSPACE_UNSANDBOXED` | Explicit unsandboxed acknowledgement |
-| `PI_CASCADE_WORKSPACE_STATE_PATH` | State file override |
-| `PI_CASCADE_STATE_DIR` | Root for Cascade runtime state |
+| `CASCADE_CONFIG` | Explicit configuration file |
+| `CASCADE_CONFIG_GLOBAL` | Override global configuration path |
+| `CASCADE_CONFIG_PROJECT` | Override project configuration path |
+| `CASCADE_MODE` | `single` or `dual` |
+| `CASCADE_PI_BIN` | Advanced override for the bundled Pi runtime executable |
+| `CASCADE_WORKER` | Worker `provider/model` |
+| `CASCADE_EXPERT` | Expert `provider/model` |
+| `CASCADE_WORKER_THINKING` | Worker thinking level |
+| `CASCADE_EXPERT_THINKING` | Expert thinking level |
+| `CASCADE_WORKER_TOOLS` | Comma list or JSON array |
+| `CASCADE_EXPERT_TOOLS` | Comma list or JSON array |
+| `CASCADE_WORKER_INSTRUCTIONS` | Worker overlay |
+| `CASCADE_EXPERT_INSTRUCTIONS` | Expert overlay |
+| `CASCADE_EXPERT_TIMEOUT_MS` | Expert timeout |
+| `CASCADE_EXPERT_MAX_OUTPUT_CHARACTERS` | Expert response bound |
+| `CASCADE_MAX_EXPERT_CALLS` | Expert call ceiling |
+| `CASCADE_MAX_EXPERT_COST_USD` | Expert cost ceiling |
+| `CASCADE_MAX_SESSION_COST_USD` | Total estimated session cost ceiling |
+| `CASCADE_ALLOW_CONTRIBUTOR` | Explicit Contributor consent |
+| `CASCADE_CLASSIFICATION` | Repository classification |
+| `CASCADE_AUTO_CONSULT` | Enable automatic consultations |
+| `CASCADE_HARNESS_MODE` | Harness mode |
+| `CASCADE_WORKSPACE` | Enable workspace runtime |
+| `CASCADE_WORKSPACE_PYTHON` | Python executable |
+| `CASCADE_WORKSPACE_SANDBOX_COMMAND` | Comma list or JSON array |
+| `CASCADE_WORKSPACE_UNSANDBOXED` | Explicit unsandboxed acknowledgement |
+| `CASCADE_WORKSPACE_STATE_PATH` | State file override |
+| `CASCADE_STATE_DIR` | Root for Cascade runtime state |
 
 Wrapper flags map to these variables for one process. The JSON file remains the authoritative way to configure every nested policy field.

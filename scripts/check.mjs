@@ -31,7 +31,7 @@ const defaults = readFileSync(join(root, "extension", "core", "defaults.mjs"), "
 const runtimeVersion = defaults.match(/PACKAGE_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
 
 for (const required of [
-  "bin/pi-cascade.mjs",
+  "bin/cascade.mjs",
   "extension/index.mjs",
   "README.md",
   "INSTALL.md",
@@ -46,7 +46,7 @@ for (const required of [
   if (!existsSync(join(root, required))) failures.push(`Missing required file: ${required}`);
 }
 if (packageJson.pi?.extensions?.[0] !== "./extension/index.mjs") failures.push("package.json Pi extension manifest is invalid");
-if (packageJson.bin?.["pi-cascade"] !== "./bin/pi-cascade.mjs") failures.push("package.json binary manifest is invalid");
+if (packageJson.bin?.["cascade"] !== "./bin/cascade.mjs") failures.push("package.json binary manifest is invalid");
 if (packageJson.dependencies?.["@earendil-works/pi-coding-agent"] !== "0.84.2") {
   failures.push("package.json must pin the standalone Pi runtime dependency to 0.84.2");
 }

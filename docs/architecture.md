@@ -15,11 +15,11 @@ Harness learning plane
 
 ## Standalone runtime delivery
 
-Pi Cascade declares `@earendil-works/pi-coding-agent@0.84.2` as a normal runtime dependency and resolves its exported package location from inside the installed Cascade package. Parent sessions, expert subprocesses, probes, and diagnostics all launch that packaged runtime directly. A global `pi` command is neither discovered nor required unless the operator explicitly supplies `--pi-bin` as a development override.
+Cascade declares `@earendil-works/pi-coding-agent@0.84.2` as a normal runtime dependency and resolves its exported package location from inside the installed Cascade package. Parent sessions, expert subprocesses, probes, and diagnostics all launch that packaged runtime directly. A global `pi` command is neither discovered nor required unless the operator explicitly supplies `--pi-bin` as a development override.
 
 ## Thin Pi integration
 
-Pi Cascade uses Pi's supported extension surface for provider registration, model switching, lifecycle events, custom tools, commands, persistent session entries, project trust, and package loading. Pi's base agent loop and terminal UI remain upstream-owned.
+Cascade uses Pi's supported extension surface for provider registration, model switching, lifecycle events, custom tools, commands, persistent session entries, project trust, and package loading. Pi's base agent loop and terminal UI remain upstream-owned.
 
 The wrapper performs the one operation an ordinary extension cannot perform before the first provider request: it selects the configured worker and injects the extension on process startup.
 

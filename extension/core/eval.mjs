@@ -127,8 +127,8 @@ export async function runEvaluation({
       env: {
         ...baseEnv,
         ...extraEnv,
-        PI_CASCADE_EVAL: "1",
-        PI_CASCADE_PACKAGE_ROOT: packageRoot
+        CASCADE_EVAL: "1",
+        CASCADE_PACKAGE_ROOT: packageRoot
       },
       timeoutMs: Number(task.timeoutMs || manifest.timeoutMs || 900000)
     });

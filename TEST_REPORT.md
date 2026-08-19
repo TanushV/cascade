@@ -1,4 +1,4 @@
-# Pi Cascade 0.1.3 Test Report
+# Cascade 0.2.0 Test Report
 
 Prepared on 2026-08-18.
 
@@ -64,4 +64,4 @@ The GitHub-source bootstrap reconstructs an exact locally tested archive and ver
 
 The build environment could not access the public npm or GitHub networks directly. The npm installation test therefore used a protocol-faithful local package fixture with the exact official Pi package name, version, exports, and executable layout. It validates package dependency installation, executable resolution, argument propagation, and process invocation, but it does not claim to have downloaded the public Pi tarball in that environment.
 
-Live Meta Model API and OpenRouter calls were not executed because the environment had neither user credentials nor outbound provider access. `pi-cascade doctor`, `pi-cascade probe worker`, and `pi-cascade probe expert` validate real authentication, streaming, tool execution, and exact selected models on the user's machine.
+Live Meta Model API and OpenRouter calls were not executed because the environment had neither user credentials nor outbound provider access. `cascade doctor`, `cascade probe worker`, and `cascade probe expert` validate real authentication, streaming, tool execution, and exact selected models on the user's machine.

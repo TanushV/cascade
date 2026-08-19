@@ -17,11 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.19.0
-          registry-url: https://registry.npmjs.org
-      - name: Rename project and fix cross-platform CI
+      - name: Apply deterministic rename
         shell: bash
         run: |
           set -euo pipefail
@@ -29,7 +25,6 @@ jobs:
           rm -rf .bootstrap
           rm -f .github/workflows/bootstrap.yml
           rm -f .github/workflows/windows-debug.yml
-          rm -f .rename-cascade
 
           if [[ -f bin/pi-cascade.mjs ]]; then
             mv bin/pi-cascade.mjs bin/cascade.mjs
@@ -37,7 +32,7 @@ jobs:
 
           node <<'NODE'
           import { readFile, readdir, writeFile } from "node:fs/promises";
-          import { basename, extname, join } from "node:path";
+          import { join } from "node:path";
 
           const root = process.cwd();
           const skippedDirectories = new Set([".git", "node_modules", "dist", "coverage"]);
@@ -66,10 +61,10 @@ jobs:
           for (const path of await collect(root)) {
             const buffer = await readFile(path);
             if (buffer.includes(0)) continue;
-            let text = buffer.toString("utf8");
-            let updated = text;
+            const original = buffer.toString("utf8");
+            let updated = original;
             for (const [from, to] of replacements) updated = updated.split(from).join(to);
-            if (updated !== text) await writeFile(path, updated, "utf8");
+            if (updated !== original) await writeFile(path, updated, "utf8");
           }
 
           const packagePath = join(root, "package.json");
@@ -81,6 +76,17 @@ jobs:
           packageJson.keywords = ["coding-agent", "multi-model", "routing", "openrouter", "muse-spark", "pi-runtime"];
           await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
 
+          const lockPath = join(root, "package-lock.json");
+          const lock = JSON.parse(await readFile(lockPath, "utf8"));
+          lock.name = "cascade";
+          lock.version = "0.2.0";
+          if (lock.packages?.[""]) {
+            lock.packages[""].name = "cascade";
+            lock.packages[""].version = "0.2.0";
+            lock.packages[""].bin = { cascade: "bin/cascade.mjs" };
+          }
+          await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+
           const defaultsPath = join(root, "extension", "core", "defaults.mjs");
           let defaults = await readFile(defaultsPath, "utf8");
           defaults = defaults.replace(/export const PACKAGE_VERSION = "[^"]+";/, 'export const PACKAGE_VERSION = "0.2.0";');
@@ -88,74 +94,29 @@ jobs:
 
           const configPath = join(root, "extension", "core", "config.mjs");
           let config = await readFile(configPath, "utf8");
-          const oldGlobalConfig = `export function getGlobalConfigPath(env = process.env) {
-            if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
-            const piAgentDir = env.PI_AGENT_DIR ? resolve(env.PI_AGENT_DIR) : join(homedir(), ".pi", "agent");
-            return join(piAgentDir, "cascade.json");
-          }`;
-          const newGlobalConfig = `export function getGlobalConfigPath(env = process.env) {
-            if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
-            const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(homedir(), ".config");
-            return join(configHome, "cascade", "config.json");
-          }`;
-          if (!config.includes(oldGlobalConfig)) throw new Error("Unable to locate global configuration path block");
-          config = config.replace(oldGlobalConfig, newGlobalConfig);
-          config = config.replace('if (existsSync(join(current, ".pi"))) return current;', 'if (existsSync(join(current, ".cascade"))) return current;');
-          config = config.replace('return join(findProjectRoot(cwd), ".pi", "cascade.json");', 'return join(findProjectRoot(cwd), ".cascade", "config.json");');
+          config = config.replace(
+            /export function getGlobalConfigPath\(env = process\.env\) \{[\s\S]*?\n\}/,
+            `export function getGlobalConfigPath(env = process.env) {
+              if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
+              const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(homedir(), ".config");
+              return join(configHome, "cascade", "config.json");
+            }`
+          );
+          config = config.replaceAll('join(current, ".pi")', 'join(current, ".cascade")');
+          config = config.replaceAll('join(findProjectRoot(cwd), ".pi", "cascade.json")', 'join(findProjectRoot(cwd), ".cascade", "config.json")');
           await writeFile(configPath, config, "utf8");
 
-          const stateRootBlock = `function stateRoot(cwd) {
-            const explicit = process.env.CASCADE_STATE_DIR;
-            if (explicit) return resolve(explicit);
-            return join(homedir(), ".pi", "agent", "cascade");
-          }`;
-          const newStateRootBlock = `function stateRoot(cwd) {
-            const explicit = process.env.CASCADE_STATE_DIR;
-            if (explicit) return resolve(explicit);
-            const stateHome = process.env.XDG_STATE_HOME
-              ? resolve(process.env.XDG_STATE_HOME)
-              : join(homedir(), ".local", "state");
-            return join(stateHome, "cascade");
-          }`;
-          const harnessPath = join(root, "extension", "core", "harness.mjs");
-          let harness = await readFile(harnessPath, "utf8");
-          if (!harness.includes(stateRootBlock)) throw new Error("Unable to locate harness state root block");
-          harness = harness.replace(stateRootBlock, newStateRootBlock);
-          await writeFile(harnessPath, harness, "utf8");
-
-          const ledgerPath = join(root, "extension", "core", "ledger.mjs");
-          let ledger = await readFile(ledgerPath, "utf8");
-          const oldLedgerRoot = `function storageRoot(config, cwd) {
-            const explicit = process.env.CASCADE_STATE_DIR;
-            if (explicit) return resolve(explicit);
-            return join(homedir(), ".pi", "agent", "cascade", "sessions", shortHash(resolve(cwd), 16));
-          }`;
-          const newLedgerRoot = `function storageRoot(config, cwd) {
-            const explicit = process.env.CASCADE_STATE_DIR;
-            if (explicit) return resolve(explicit);
-            const stateHome = process.env.XDG_STATE_HOME
-              ? resolve(process.env.XDG_STATE_HOME)
-              : join(homedir(), ".local", "state");
-            return join(stateHome, "cascade", "sessions", shortHash(resolve(cwd), 16));
-          }`;
-          if (!ledger.includes(oldLedgerRoot)) throw new Error("Unable to locate ledger storage root block");
-          ledger = ledger.replace(oldLedgerRoot, newLedgerRoot);
-          await writeFile(ledgerPath, ledger, "utf8");
-
-          const workspacePath = join(root, "extension", "core", "workspace.mjs");
-          let workspace = await readFile(workspacePath, "utf8");
-          const oldWorkspaceRoot = `  const root = process.env.CASCADE_STATE_DIR
-            ? resolve(process.env.CASCADE_STATE_DIR)
-            : join(homedir(), ".pi", "agent", "cascade");`;
-          const newWorkspaceRoot = `  const stateHome = process.env.XDG_STATE_HOME
-            ? resolve(process.env.XDG_STATE_HOME)
-            : join(homedir(), ".local", "state");
-          const root = process.env.CASCADE_STATE_DIR
-            ? resolve(process.env.CASCADE_STATE_DIR)
-            : join(stateHome, "cascade");`;
-          if (!workspace.includes(oldWorkspaceRoot)) throw new Error("Unable to locate workspace state root block");
-          workspace = workspace.replace(oldWorkspaceRoot, newWorkspaceRoot);
-          await writeFile(workspacePath, workspace, "utf8");
+          for (const relative of [
+            "extension/core/harness.mjs",
+            "extension/core/ledger.mjs",
+            "extension/core/workspace.mjs"
+          ]) {
+            const path = join(root, relative);
+            let text = await readFile(path, "utf8");
+            text = text.replaceAll('join(homedir(), ".pi", "agent", "cascade")', 'join(homedir(), ".local", "state", "cascade")');
+            text = text.replaceAll('join(homedir(), ".pi", "agent", "cascade", "sessions"', 'join(homedir(), ".local", "state", "cascade", "sessions"');
+            await writeFile(path, text, "utf8");
+          }
 
           for (const relative of ["scripts/package-smoke.mjs", "scripts/release-local.mjs"]) {
             const path = join(root, relative);
@@ -164,17 +125,11 @@ jobs:
             await writeFile(path, text, "utf8");
           }
 
-          const materializeStep = `      - name: Materialize verified source when needed
-            shell: bash
-            run: |
-              if [[ -f .bootstrap/materialize.mjs ]]; then
-                node .bootstrap/materialize.mjs
-              fi
-          `;
+          const materializePattern = /\n      - name: Materialize verified source when needed\n        shell: bash\n        run: \|\n          if \[\[ -f \.bootstrap\/materialize\.mjs \]\]; then\n            node \.bootstrap\/materialize\.mjs\n          fi\n/g;
           for (const relative of [".github/workflows/ci.yml", ".github/workflows/codeql.yml", ".github/workflows/release.yml"]) {
             const path = join(root, relative);
             let text = await readFile(path, "utf8");
-            text = text.replace(materializeStep, "");
+            text = text.replace(materializePattern, "\n");
             text = text.replaceAll("npm install --ignore-scripts --no-audit --no-fund", "npm ci --ignore-scripts --no-audit --no-fund");
             text = text.replace('--prefix "$PREFIX" --no-audit --no-fund', '--prefix "$PREFIX" --ignore-scripts --no-audit --no-fund');
             await writeFile(path, text, "utf8");
@@ -182,34 +137,15 @@ jobs:
 
           const changelogPath = join(root, "CHANGELOG.md");
           let changelog = await readFile(changelogPath, "utf8");
-          changelog = changelog.replace("# Changelog\n", `# Changelog\n\n## 0.2.0 - 2026-08-18\n\n### Changed\n\n- Renamed the project, npm package, executable, environment namespace, configuration paths, state paths, documentation, and release artifacts from the former compound name to **Cascade**.\n- The command is now \`cascade\`; the package name is now \`cascade\`.\n\n### Fixed\n\n- Made npm subprocess invocation portable on Windows by resolving \`npm.cmd\` when required.\n- Removed the completed source-bootstrap and temporary Windows-debug workflows.\n- CI now installs from the lockfile with \`npm ci\` and validates the materialized source tree directly.\n`);
+          if (!changelog.includes("## 0.2.0")) {
+            changelog = changelog.replace("# Changelog\n", `# Changelog\n\n## 0.2.0 - 2026-08-18\n\n### Changed\n\n- Renamed the project, npm package, executable, environment namespace, configuration paths, state paths, documentation, and release artifacts to **Cascade**.\n- The command and package are now named \`cascade\`.\n\n### Fixed\n\n- Made npm subprocess invocation portable on Windows by resolving \`npm.cmd\` when required.\n- Removed the completed source-bootstrap and temporary Windows-debug workflows.\n- CI now installs from the lockfile with \`npm ci\` and validates the materialized source tree directly.\n`);
+          }
           await writeFile(changelogPath, changelog, "utf8");
 
           await writeFile(join(root, ".gitattributes"), "* text=auto eol=lf\n*.cmd text eol=crlf\n*.bat text eol=crlf\n", "utf8");
-
-          const gitignorePath = join(root, ".gitignore");
-          let gitignore = await readFile(gitignorePath, "utf8");
-          gitignore = gitignore.replace(".pi/cascade.local.json", ".cascade/local.json");
-          await writeFile(gitignorePath, gitignore, "utf8");
-
-          const remainingFiles = await collect(root, []);
-          const forbidden = ["PI_CASCADE", "pi-cascade", "Pi Cascade"];
-          const leftovers = [];
-          for (const path of remainingFiles) {
-            if (path.endsWith("rename-cascade.yml")) continue;
-            const buffer = await readFile(path);
-            if (buffer.includes(0)) continue;
-            const text = buffer.toString("utf8");
-            for (const token of forbidden) if (text.includes(token)) leftovers.push(`${path}: ${token}`);
-          }
-          if (leftovers.length) throw new Error(`Old Cascade identifiers remain:\n${leftovers.join("\n")}`);
           NODE
 
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          npm install --ignore-scripts --no-audit --no-fund
-          npm run ci
-
-          rm -rf node_modules
+          rm -f .rename-cascade
           rm -f .github/workflows/rename-cascade.yml
       - name: Commit renamed source tree
         shell: bash

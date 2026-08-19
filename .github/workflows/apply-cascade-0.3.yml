@@ -28,7 +28,7 @@ jobs:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Apply and validate the clean Cascade 0.3 patch
+      - name: Apply, validate, and publish the Cascade 0.3 runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -36,7 +36,13 @@ jobs:
           echo "475dc084052be9975284a7099474a0788e301b65259c86cc61708ea6191bce3a  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict
           gzip -dc "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch"
           git apply --index "$RUNNER_TEMP/cascade.patch"
-          rm -rf .publish .github/workflows/apply-cascade-0.3.yml
+
+          # GITHUB_TOKEN may publish source but may not create or change workflow files.
+          # Keep both workflows unchanged for this commit; the repository API installs
+          # the already-tested final CI workflow and removes this helper afterward.
+          git restore --source=HEAD --staged --worktree .github/workflows/ci.yml
+          rm -rf .publish
+
           npm ci --ignore-scripts --no-audit --no-fund
           npm run ci
           git config user.name "TanushV"

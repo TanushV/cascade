@@ -47,23 +47,35 @@ cascade self-test
 
 ## Worker and expert profiles
 
+Ordinary users can configure both roles through `/cascade-setup`, `/cascade-worker`, and `/cascade-expert`. The JSON representation is:
+
 ```json
 {
+  "selectionMode": "native",
+  "thinkingMode": "native",
   "provider": "openrouter",
   "model": "vendor/model-id",
   "thinking": "high",
-  "tools": ["read", "grep", "find", "ls", "bash"],
+  "restrictTools": false,
+  "tools": ["read", "grep", "find", "ls", "bash", "edit", "write"],
   "instructions": "Profile-specific instructions",
   "timeoutMs": 600000,
   "maxOutputCharacters": 120000
 }
 ```
 
-`provider`, `model`, `thinking`, `tools`, and `instructions` are supported for both roles. `timeoutMs` and `maxOutputCharacters` govern isolated expert episodes.
+`selectionMode` is:
+
+- `native`: preserve Pi's current model and native `/model` picker;
+- `configured`: activate the exact `provider` and `model` after the TUI starts.
+
+`thinkingMode` is `native` or `configured`. `restrictTools: false` preserves Pi's active tools. When `restrictTools` is `true`, the role uses the explicit `tools` allowlist plus required Cascade controls.
+
+The worker defaults to native selection and unrestricted tools. The expert defaults to configured selection. `timeoutMs` and `maxOutputCharacters` govern isolated expert episodes.
 
 Valid thinking levels follow Pi: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Pi clamps unsupported levels to model capability.
 
-Consultation, review, and investigation automatically remove `edit` and `write` from the expert tool list. An explicitly authorized takeover uses the expert's configured list.
+Consultation and review remove `edit` and `write` even when present in the expert list. An explicitly authorized takeover uses the configured expert list.
 
 ## Custom providers
 
@@ -134,7 +146,7 @@ The bundled `meta-model-api` profile is ordinary configuration and may be overri
 }
 ```
 
-The router scores the observed trajectory. It does not classify difficulty from the initial prompt alone. Automatic expert calls are disabled by default.
+The router scores the observed trajectory. It does not classify difficulty from the initial prompt alone. Automatic expert consultation is enabled by default but remains subject to trajectory thresholds, cooldown, and budgets.
 
 ## Budgets
 
@@ -254,6 +266,48 @@ Modes are `off`, `observe`, `propose`, `canary`, and `auto-local`. Global execut
 
 A sandbox command is an argument array and may contain `{python}`, `{script}`, and `{cwd}` placeholders. See `programmatic-workspace.md`.
 
+## TUI configuration
+
+```text
+/cascade-setup
+/cascade-worker
+/cascade-expert
+/cascade-auth
+/cascade-tools
+```
+
+The setup wizard can save to the current session, `.cascade/config.json`, or `~/.config/cascade/config.json`. Pi's native `/login` and `/model` commands remain available.
+
+## Global Pi compaction limits
+
+These settings live in Pi's global settings file, not the Cascade config:
+
+```json
+{
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 24000,
+    "keepRecentTokens": 32000
+  }
+}
+```
+
+Edit them through `/cascade-compaction` or:
+
+```bash
+cascade compaction show
+cascade compaction set --enabled true --reserve-tokens 24000 --keep-recent-tokens 32000
+```
+
+## Updates
+
+```bash
+cascade update
+cascade update --dry-run
+```
+
+The default update source is `github:TanushV/cascade`; `CASCADE_UPDATE_SPEC` can override it for development or forks. The TUI equivalent is `/cascade-update`.
+
 ## Environment variables
 
 | Variable | Meaning |
@@ -286,5 +340,7 @@ A sandbox command is an argument array and may contain `{python}`, `{script}`, a
 | `CASCADE_WORKSPACE_UNSANDBOXED` | Explicit unsandboxed acknowledgement |
 | `CASCADE_WORKSPACE_STATE_PATH` | State file override |
 | `CASCADE_STATE_DIR` | Root for Cascade runtime state |
+| `CASCADE_UPDATE_SPEC` | Override the GitHub/npm source used by `cascade update` |
+| `PI_CODING_AGENT_DIR` | Override Pi's global agent/settings/auth directory |
 
 Wrapper flags map to these variables for one process. The JSON file remains the authoritative way to configure every nested policy field.

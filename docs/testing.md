@@ -1,39 +1,52 @@
 # Testing
 
-## Automated local suite
-
-Run:
+## Full local suite
 
 ```bash
-npm test
-npm run check
-npm run smoke
+npm ci --ignore-scripts
+npm run ci
 ```
 
-The suite covers:
+The test suite covers:
 
-- configuration precedence and project trust;
-- full worker/expert profile overrides;
-- one-model collapse;
-- provider registration and exact model selection;
-- isolated expert JSON-stream parsing;
-- read-only consultation and editable takeover tool policies;
-- append-only evidence persistence and session recovery;
-- route escalation, decay, cooldown, and budget admission;
-- Contributor consent, secret redaction, image denial, and protected paths;
-- real temporary Git repositories and completion verification;
-- harness proposals, canaries, replay metrics, promotion, rollback, and non-persistence of canaries;
-- optional workspace sandbox refusal and bounded state persistence;
-- package overlay installation;
-- npm package creation, local installation, and isolated global installation with no pre-existing `pi` executable.
+- configuration precedence, project trust, legacy-config migration, and invalid-config fallback;
+- native versus configured worker selection;
+- preservation and reversible restriction of Pi's active tools;
+- role-aware model/thinking changes;
+- TUI setup and project/global/session persistence;
+- native `/login` handoff and Pi model-registry selection;
+- exact expert subprocess configuration, read-only consultation, and takeover;
+- evidence persistence, routing, budgets, verification, and harness replay;
+- Contributor consent, redaction, image denial, and protected paths;
+- global Pi compaction settings and CLI editing;
+- one-command self-update construction and execution;
+- package creation, local/global installation, and Git-source installation;
+- Windows command-shim handling;
+- a real pseudo-terminal launch of the bundled Pi TUI.
 
-A protocol-faithful local npm registry supplies a package with the exact official Pi package name, version, exports, and CLI layout during offline release smoke tests. The final Cascade tarball is installed by itself, proving npm resolves the runtime as its dependency rather than relying on a pre-existing global `pi` command. Protocol-faithful fake Pi executables are also used for focused child-process tests. Repository verification tests use actual Git and actual subprocess commands.
+## Real TUI smoke test
 
-## What local tests do not prove
+On Unix-like systems, `tests/tui-smoke.test.mjs` runs `scripts/tui-smoke.py` against the actual installed Pi runtime. It deliberately removes provider keys and creates the exact legacy `.cascade/config.json` that previously caused startup rejection.
 
-The build environment has no provider credentials and no direct network access. Therefore the local suite does not claim that a particular OpenRouter route or Meta catalog entry is currently enabled for your account.
+The test verifies that:
 
-Run the live probes after configuring credentials:
+1. Pi renders its native TUI;
+2. Cascade does not reject startup;
+3. native `read`, `bash`, `edit`, and `write` tools remain active;
+4. `/cascade-setup` opens and cancels cleanly;
+5. Pi's native `/model` interface opens;
+6. Pi's native `/login` interface opens;
+7. Cascade exits through Pi's normal keybinding.
+
+No model endpoint or user key is used.
+
+## Offline packaging smoke test
+
+A protocol-faithful local npm registry supplies the exact Pi package name/version/layout during packaging tests. The final Cascade tarball is installed by itself into local, isolated-global, and Git-source prefixes. This proves Cascade resolves its own runtime dependency and does not depend on a pre-existing global `pi` command.
+
+## Live provider probes
+
+The automated suite intentionally does not use provider credentials. Run these with your own account after authentication:
 
 ```bash
 cascade doctor --approve
@@ -41,18 +54,12 @@ cascade probe worker --approve
 cascade probe expert --approve
 ```
 
-A probe verifies authentication, exact model selection, streaming completion, tool execution, usage reporting, and Pi's provider adapter path. It consumes a small amount of provider quota.
+A probe consumes provider quota and verifies authentication, exact model selection, streaming, tool execution, usage reporting, and the provider adapter path.
 
 ## Evaluation manifests
-
-`cascade eval` executes each task in Pi JSON mode and then runs deterministic checks.
 
 ```bash
 cascade eval examples/eval-manifest.json --output eval-report.json
 ```
 
-Harness replay executes the same manifest under baseline and canary harness states. Isolation is enabled by default. `--no-isolation` is available for controlled disposable workspaces and may contaminate state between runs.
-
-## Release evidence
-
-`TEST_REPORT.md` records the exact commands, runtime, counts, and limitations for the distributed archive.
+Harness replay executes the same manifest under baseline and candidate harness states. Isolation is enabled by default.

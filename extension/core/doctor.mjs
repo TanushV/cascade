@@ -18,6 +18,7 @@ function commandAvailable(command) {
 function credentialStatus(config, env = process.env) {
   const required = new Map();
   for (const model of [config.worker, ...(config.mode === "dual" ? [config.expert] : [])]) {
+    if (model?.selectionMode === "native") continue;
     const provider = config.providers?.[model.provider];
     if (!provider) continue;
     const key = String(provider.apiKey || "");
@@ -51,11 +52,15 @@ export function runDoctor({ config, cwd, packageRoot, validation, sources = [] }
   add("Configuration", validation.errors.length === 0, validation.errors.length ? validation.errors.join("; ") : "valid");
   for (const warning of validation.warnings) add("Configuration warning", true, warning, "warning");
 
-  const workerPolicy = evaluateContributorPolicy(config, config.worker);
-  add("Worker data policy", workerPolicy.allowed, workerPolicy.reason);
+  if (config.worker?.selectionMode === "native") {
+    add("Worker data policy", true, "native Pi model is selected at runtime");
+  } else {
+    const workerPolicy = evaluateContributorPolicy(config, config.worker);
+    add("Worker data policy", workerPolicy.allowed, workerPolicy.reason, workerPolicy.allowed ? "info" : "warning");
+  }
   if (config.mode === "dual") {
     const expertPolicy = evaluateContributorPolicy(config, config.expert);
-    add("Expert data policy", expertPolicy.allowed, expertPolicy.reason);
+    add("Expert data policy", expertPolicy.allowed, expertPolicy.reason, expertPolicy.allowed ? "info" : "warning");
   }
 
   for (const credential of credentialStatus(config)) {

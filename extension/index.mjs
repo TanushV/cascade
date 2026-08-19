@@ -23,7 +23,19 @@ import {
   summarizeVerificationReport
 } from "./core/verification.mjs";
 import { runProgrammaticWorkspace } from "./core/workspace.mjs";
-import { modelReference, parseModelReference, shortHash, truncateText } from "./core/util.mjs";
+import { deepClone, modelReference, parseModelReference, shortHash, truncateText } from "./core/util.mjs";
+import {
+  applyRoleToolPolicy,
+  captureNativeToolBaseline,
+  createToolPolicyState,
+  modelId,
+  sameModel,
+  snapshotPiSurface,
+  usesConfiguredModel
+} from "./core/pi-parity.mjs";
+import { chooseLoginProvider, prepareNativeLogin, runCascadeSetup, runRoleModelPicker } from "./core/tui-setup.mjs";
+import { getPiGlobalCompaction, runGlobalCompactionWizard } from "./core/pi-settings.mjs";
+import { buildUpdateInvocation } from "./core/updater.mjs";
 
 const EXTENSION_PATH = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = dirname(dirname(EXTENSION_PATH));
@@ -114,13 +126,19 @@ function activeModelConfig(ctx, config, currentRole) {
   const provider = ctx.model?.provider;
   const id = ctx.model?.id || ctx.model?.model || ctx.model?.modelId;
   if (provider && id) return { provider, model: id };
+  if (currentRole === "worker" && !usesConfiguredModel(config.worker)) {
+    return { provider: "native", model: "unselected" };
+  }
   return currentRole === "expert" ? config.expert : config.worker;
 }
 
-function formatStatus({ config, ledger, router, currentRole, blockedReason, harness }) {
+function formatStatus({ config, ledger, router, currentRole, blockedReason, harness, activeModel }) {
   const totals = ledger?.totals() || { expertCalls: 0, estimatedTotalCostUsd: 0 };
   const route = router?.snapshot() || { level: "worker", score: 0 };
-  const data = isContributorModel(currentRole === "expert" ? config.expert : config.worker, config.privacy.contributorPattern)
+  const policyProfile = currentRole === "worker" && !usesConfiguredModel(config.worker)
+    ? activeModel
+    : (currentRole === "expert" ? config.expert : config.worker);
+  const data = isContributorModel(policyProfile, config.privacy.contributorPattern)
     ? "CONTRIBUTOR"
     : "PRIVATE";
   const harnessHash = harness?.manifest().combinedHash?.slice(0, 6) || "none";
@@ -135,7 +153,7 @@ function buildSystemAppendix({ config, router, harness, currentRole, contributor
   const lines = [
     "# Cascade runtime",
     "",
-    `Mode: ${config.mode}. Active role: ${currentRole}. Active profile: ${describeModel(role)}.`,
+    `Mode: ${config.mode}. Active role: ${currentRole}. Active profile: ${currentRole === "worker" && !usesConfiguredModel(config.worker) ? "native Pi model" : describeModel(role)}.`,
     `Current route state: ${route.level} (score ${route.score}).`,
     "Use executable repository evidence before conclusions. Keep one workspace owner. Record a checkpoint after material progress or before changing strategy.",
     "Do not restart repository investigation when a verified evidence packet already contains the fact. Preserve failed approaches so they are not repeated.",
@@ -199,6 +217,44 @@ export default function cascadeExtension(pi) {
   let lastGateDiffKey = "";
   let completionGateRuns = 0;
   let completionGateInFlight = false;
+  let workerRuntimeModel;
+  let workerRuntimeThinking;
+  let roleSwitchInProgress = false;
+  let startupWarningShown = false;
+  const toolPolicyState = createToolPolicyState();
+  let nativeSurfaceAtLoad = { tools: [], commands: [] };
+
+  function captureWorkerRuntime(ctx) {
+    if (!ctx?.model) return;
+    workerRuntimeModel = ctx.model;
+    workerRuntimeThinking = ctx.thinkingLevel ?? pi.getThinkingLevel?.();
+    if (!usesConfiguredModel(config.worker)) {
+      config.worker = {
+        ...config.worker,
+        provider: ctx.model.provider,
+        model: modelId(ctx.model)
+      };
+    }
+  }
+
+  function cascadeControlTools(role) {
+    const controls = CONTROL_TOOLS.filter((name) => {
+      if (name === "cascade_expert" && config.mode !== "dual") return false;
+      return role === "worker" || name !== "cascade_expert";
+    });
+    if (config.workspaceRuntime?.enabled) controls.push("cascade_workspace");
+    return controls;
+  }
+
+  function applyTools(role, profile) {
+    captureNativeToolBaseline(pi, toolPolicyState);
+    return applyRoleToolPolicy({
+      pi,
+      profile,
+      controls: cascadeControlTools(role),
+      state: toolPolicyState
+    });
+  }
 
   function loadConfig(cwd, projectTrusted) {
     const result = loadEffectiveConfig({
@@ -212,18 +268,36 @@ export default function cascadeExtension(pi) {
     if (flagMode === "single" || flagMode === "dual") config.mode = flagMode;
     const workerFlag = pi.getFlag?.("cascade-worker");
     const workerRef = parseModelReference(typeof workerFlag === "string" ? workerFlag : "");
-    if (workerRef?.provider && workerRef?.model) config.worker = { ...config.worker, ...workerRef };
+    if (workerRef?.provider && workerRef?.model) {
+      config.worker = {
+        ...config.worker,
+        ...workerRef,
+        selectionMode: "configured",
+        thinkingMode: "configured"
+      };
+    }
     const expertFlag = pi.getFlag?.("cascade-expert");
     const expertRef = parseModelReference(typeof expertFlag === "string" ? expertFlag : "");
-    if (expertRef?.provider && expertRef?.model) config.expert = { ...config.expert, ...expertRef };
+    if (expertRef?.provider && expertRef?.model) {
+      config.expert = {
+        ...config.expert,
+        ...expertRef,
+        selectionMode: "configured",
+        thinkingMode: "configured"
+      };
+    }
     const workerThinking = pi.getFlag?.("cascade-worker-thinking");
-    if (typeof workerThinking === "string" && workerThinking) config.worker.thinking = workerThinking;
+    if (typeof workerThinking === "string" && workerThinking) {
+      config.worker = { ...config.worker, thinking: workerThinking, thinkingMode: "configured" };
+    }
     const expertThinking = pi.getFlag?.("cascade-expert-thinking");
-    if (typeof expertThinking === "string" && expertThinking) config.expert.thinking = expertThinking;
+    if (typeof expertThinking === "string" && expertThinking) {
+      config.expert = { ...config.expert, thinking: expertThinking, thinkingMode: "configured" };
+    }
     const workerTools = parseToolList(pi.getFlag?.("cascade-worker-tools"));
-    if (workerTools) config.worker.tools = workerTools;
+    if (workerTools) config.worker = { ...config.worker, tools: workerTools, restrictTools: true };
     const expertTools = parseToolList(pi.getFlag?.("cascade-expert-tools"));
-    if (expertTools) config.expert.tools = expertTools;
+    if (expertTools) config.expert = { ...config.expert, tools: expertTools, restrictTools: true };
     const workerInstructions = pi.getFlag?.("cascade-worker-instructions");
     if (typeof workerInstructions === "string") config.worker.instructions = workerInstructions;
     const expertInstructions = pi.getFlag?.("cascade-expert-instructions");
@@ -240,8 +314,20 @@ export default function cascadeExtension(pi) {
     return result;
   }
 
+  // Extension factories run before Pi activates action methods such as getFlag(),
+  // getAllTools(), and setModel(). Only registration APIs are safe here. Load the
+  // environment/file configuration directly, then perform action-dependent work
+  // from session_start after the runtime is active.
   try {
-    loadConfig(process.cwd(), projectTrustedFromEnvironment());
+    const preliminary = loadEffectiveConfig({
+      cwd: process.cwd(),
+      projectTrusted: projectTrustedFromEnvironment(),
+      explicitPath: process.env.CASCADE_CONFIG || undefined,
+      throwOnError: false
+    });
+    config = preliminary.validation.errors.length ? deepClone(DEFAULT_CONFIG) : preliminary.config;
+    validation = preliminary.validation;
+    configSources = preliminary.validation.errors.length ? [{ type: "defaults", path: null }] : preliminary.sources;
     registerConfiguredProviders(pi, config, { onWarning: (message) => console.error(`[cascade] ${message}`) });
   } catch (error) {
     console.error(`[cascade] preliminary configuration failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -249,7 +335,15 @@ export default function cascadeExtension(pi) {
 
   function updateStatus(ctx = activeCtx) {
     if (!ctx || !config.ui.showStatus) return;
-    ctx.ui.setStatus("cascade", formatStatus({ config, ledger, router, currentRole, blockedReason, harness }));
+    ctx.ui.setStatus("cascade", formatStatus({
+      config,
+      ledger,
+      router,
+      currentRole,
+      blockedReason,
+      harness,
+      activeModel: ctx.model
+    }));
   }
 
   function notify(ctx, message, type = "info") {
@@ -285,31 +379,64 @@ ${state.stagedStat || ""}`, 24),
   async function activateRole(role, ctx, { quiet = false } = {}) {
     const target = role === "expert" ? config.expert : config.worker;
     if (role === "expert" && config.mode !== "dual") throw new Error("Expert role is unavailable in single-model mode");
-    const policy = policyFor(target);
-    if (!policy.allowed) throw new Error(policy.reason);
-    const model = findConfiguredModel(ctx, target);
-    if (!model) throw new Error(`Configured ${role} model was not found: ${describeModel(target)}`);
-    const changed = await pi.setModel(model);
-    if (!changed) throw new Error(`No usable credentials for ${describeModel(target)}`);
-    pi.setThinkingLevel(target.thinking);
-    const available = new Set(pi.getAllTools().map((tool) => tool.name));
-    const controls = CONTROL_TOOLS.filter((name) => {
-      if (name === "cascade_expert" && config.mode !== "dual") return false;
-      return role === "worker" || name !== "cascade_expert";
-    });
-    const optionalControls = config.workspaceRuntime?.enabled ? ["cascade_workspace"] : [];
-    const desired = [...target.tools, ...controls, ...optionalControls];
-    pi.setActiveTools([...new Set(desired)].filter((name) => available.has(name)));
+
+    roleSwitchInProgress = true;
+    try {
+      if (role === "worker" && !usesConfiguredModel(target)) {
+        if (!workerRuntimeModel && ctx.model) captureWorkerRuntime(ctx);
+        if (workerRuntimeModel && !sameModel(ctx.model, workerRuntimeModel)) {
+          const changed = await pi.setModel(workerRuntimeModel);
+          if (!changed) throw new Error(`No usable credentials for ${workerRuntimeModel.provider}/${modelId(workerRuntimeModel)}`);
+        }
+        if (target.thinkingMode === "configured" && target.thinking) pi.setThinkingLevel(target.thinking);
+        else if (workerRuntimeThinking) pi.setThinkingLevel(workerRuntimeThinking);
+      } else {
+        const policy = policyFor(target);
+        if (!policy.allowed) throw new Error(policy.reason);
+        const model = findConfiguredModel(ctx, target);
+        if (!model) throw new Error(`Configured ${role} model was not found: ${describeModel(target)}`);
+        const changed = await pi.setModel(model);
+        if (!changed) throw new Error(`No usable credentials for ${describeModel(target)}`);
+        if (target.thinkingMode !== "native" && target.thinking) pi.setThinkingLevel(target.thinking);
+      }
+    } finally {
+      roleSwitchInProgress = false;
+    }
+
+    applyTools(role, target);
     currentRole = role;
     blockedReason = "";
-    if (!quiet) notify(ctx, `Cascade active role: ${role} (${describeModel(target)})`, "info");
+    if (!quiet) {
+      const label = role === "worker" && !usesConfiguredModel(target)
+        ? (ctx.model ? `${ctx.model.provider}/${modelId(ctx.model)}` : "native Pi model")
+        : describeModel(target);
+      notify(ctx, `Cascade active role: ${role} (${label})`, "info");
+    }
     updateStatus(ctx);
   }
 
   function initialize(ctx) {
     activeCtx = ctx;
-    const result = loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
+    let result;
+    try {
+      result = loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
+    } catch (error) {
+      config = deepClone(DEFAULT_CONFIG);
+      validation = { errors: [], warnings: [] };
+      configSources = [{ type: "defaults", path: null }];
+      result = { validation, sources: configSources };
+      notify(ctx, `Cascade configuration could not be loaded. Native Pi remains available: ${error instanceof Error ? error.message : String(error)}`, "warning");
+    }
+    if (result.validation?.errors?.length) {
+      config = deepClone(DEFAULT_CONFIG);
+      validation = { errors: [], warnings: result.validation.warnings || [] };
+      configSources = [{ type: "defaults", path: null }];
+    }
     registerConfiguredProviders(pi, config, { onWarning: (message) => notify(ctx, message, "warning") });
+    if (!usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
+    nativeSurfaceAtLoad = snapshotPiSurface(pi);
+    captureNativeToolBaseline(pi, toolPolicyState);
+
     const piSessionId = ctx.sessionManager?.getSessionId?.();
     ledger = new EvidenceLedger({ cwd: ctx.cwd, config, harnessManifest: { pending: true }, sessionId: piSessionId });
     harness = new HarnessStore({ cwd: ctx.cwd, config, sessionId: piSessionId || ledger.sessionId });
@@ -323,14 +450,15 @@ ${state.stagedStat || ""}`, 24),
     completionGateRuns = 0;
     completionGateInFlight = false;
     blockedReason = "";
-    const initialProfile = currentRole === "expert" ? config.expert : config.worker;
-    const initialPolicy = policyFor(initialProfile);
-    if (!initialPolicy.allowed) blockedReason = initialPolicy.reason;
     initialized = true;
-    for (const warning of result.validation.warnings) notify(ctx, warning, "warning");
-    if (result.validation.errors.length) {
-      blockedReason = result.validation.errors.join("; ");
-      notify(ctx, `Cascade configuration errors: ${blockedReason}`, "error");
+
+    for (const warning of result.validation?.warnings || []) notify(ctx, warning, "warning");
+    if (result.validation?.errors?.length) {
+      notify(ctx, `Cascade configuration has errors; native Pi remains available: ${result.validation.errors.join("; ")}`, "warning");
+    }
+    if (!startupWarningShown && process.env.CASCADE_STARTUP_WARNING) {
+      startupWarningShown = true;
+      notify(ctx, process.env.CASCADE_STARTUP_WARNING, "warning");
     }
     updateStatus(ctx);
   }
@@ -577,25 +705,39 @@ ${state.stagedStat || ""}`, 24),
 
   pi.on("session_start", async (_event, ctx) => {
     initialize(ctx);
-    if (process.env.CASCADE_CHILD === "1") return;
-    if (!blockedReason) {
-      try {
-        await activateRole("worker", ctx, { quiet: true });
-      } catch (error) {
-        blockedReason = error instanceof Error ? error.message : String(error);
-        notify(ctx, `Cascade could not activate worker: ${blockedReason}`, "error");
-      }
+    if (process.env.CASCADE_CHILD === "1") {
+      applyTools("expert", config.expert);
+      return;
+    }
+    try {
+      await activateRole("worker", ctx, { quiet: true });
+    } catch (error) {
+      // A Cascade profile must never prevent Pi from opening. Fall back to the
+      // model and tool surface Pi already started with, and leave setup/login to
+      // the operator inside the TUI.
+      const reason = error instanceof Error ? error.message : String(error);
+      config.worker = { ...config.worker, selectionMode: "native", thinkingMode: "native", restrictTools: false };
+      captureWorkerRuntime(ctx);
+      applyTools("worker", config.worker);
+      currentRole = "worker";
+      blockedReason = "";
+      notify(ctx, `Cascade worker profile is unavailable; continuing with native Pi: ${reason}`, "warning");
     }
     updateStatus(ctx);
   });
 
   pi.on("input", (event, ctx) => {
     ensureInitialized(ctx);
+    const original = String(event.text || "");
+    // Never trap the operator behind a policy gate. Native Pi slash commands
+    // such as /login, /model, /settings, and Cascade setup commands must remain
+    // usable even when the currently selected inference endpoint is blocked.
+    if (original.trimStart().startsWith("/")) return { action: "continue" };
     const target = activeModelConfig(ctx, config, currentRole);
     const policy = policyFor(target);
     if (!policy.allowed) {
       blockedReason = policy.reason;
-      notify(ctx, `Cascade blocked this prompt: ${policy.reason}`, "error");
+      notify(ctx, `Cascade blocked model inference, not the TUI: ${policy.reason}. Use /model, /login, or /cascade-setup.`, "error");
       updateStatus(ctx);
       return { action: "handled" };
     }
@@ -612,7 +754,6 @@ ${state.stagedStat || ""}`, 24),
       notify(ctx, `Cascade blocked this prompt: ${reason}`, "error");
       return { action: "handled" };
     }
-    const original = String(event.text || "");
     const safeText = policy.contributor && config.privacy.redactSecrets ? redactSecrets(original) : original;
     ledger.recordUserGoal(safeText);
     if (safeText !== original) {
@@ -838,9 +979,193 @@ ${summarizeVerificationReport(report)}` }],
     });
   });
 
-  pi.on("model_select", (_event, ctx) => {
+  pi.on("model_select", (event, ctx) => {
     activeCtx = ctx;
+    if (!roleSwitchInProgress) {
+      if (currentRole === "worker") {
+        workerRuntimeModel = event.model;
+        workerRuntimeThinking = ctx.thinkingLevel ?? pi.getThinkingLevel?.();
+        config.worker = {
+          ...config.worker,
+          provider: event.model.provider,
+          model: modelId(event.model)
+        };
+      } else if (currentRole === "expert") {
+        config.expert = {
+          ...config.expert,
+          selectionMode: "configured",
+          provider: event.model.provider,
+          model: modelId(event.model)
+        };
+      }
+    }
     updateStatus(ctx);
+  });
+
+  pi.on("thinking_level_select", (event, ctx) => {
+    activeCtx = ctx;
+    if (!roleSwitchInProgress) {
+      if (currentRole === "worker") {
+        workerRuntimeThinking = event.level;
+        if (config.worker.thinkingMode === "configured") config.worker.thinking = event.level;
+      } else if (currentRole === "expert") {
+        config.expert = {
+          ...config.expert,
+          thinkingMode: "configured",
+          thinking: event.level
+        };
+      }
+    }
+    updateStatus(ctx);
+  });
+
+  function adoptConfig(nextConfig, ctx) {
+    config = deepClone(nextConfig);
+    validation = validateConfig(config);
+    if (router) router.config = config;
+    if (ledger) ledger.config = config;
+    if (harness) {
+      harness = new HarnessStore({
+        cwd: ctx.cwd,
+        config,
+        sessionId: ctx.sessionManager?.getSessionId?.() || ledger?.sessionId
+      });
+      if (ledger) ledger.harnessManifest = harness.manifest();
+    }
+  }
+
+  async function applySetupResult(result, ctx, { activateWorker = true } = {}) {
+    if (!result || result.cancelled) return false;
+    adoptConfig(result.config, ctx);
+    if (activateWorker) {
+      try {
+        await activateRole("worker", ctx, { quiet: true });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        currentRole = "worker";
+        applyRoleToolPolicy({
+          pi,
+          profile: { restrictTools: false },
+          controls: cascadeControlTools("worker"),
+          state: toolPolicyState
+        });
+        notify(ctx, `Settings saved. The selected worker is not ready yet, so native Pi remains active: ${reason}`, "warning");
+      }
+    }
+    if (result.loginProvider) prepareNativeLogin(ctx, result.loginProvider);
+    const location = result.path || "this session";
+    notify(ctx, `Cascade settings applied to ${location}.`, "info");
+    updateStatus(ctx);
+    return true;
+  }
+
+  pi.registerCommand("cascade-setup", {
+    description: "Configure Cascade models, mode, tools, privacy, and budgets in the TUI",
+    async handler(_args, ctx) {
+      ensureInitialized(ctx);
+      try {
+        const result = await runCascadeSetup({ ctx, config });
+        await applySetupResult(result, ctx);
+      } catch (error) {
+        notify(ctx, error instanceof Error ? error.message : String(error), "error");
+      }
+    }
+  });
+
+  pi.registerCommand("cascade-worker", {
+    description: "Choose the worker model through Pi's model registry",
+    async handler(_args, ctx) {
+      ensureInitialized(ctx);
+      try {
+        const result = await runRoleModelPicker({ ctx, config, role: "worker" });
+        await applySetupResult(result, ctx);
+      } catch (error) {
+        notify(ctx, error instanceof Error ? error.message : String(error), "error");
+      }
+    }
+  });
+
+  pi.registerCommand("cascade-expert", {
+    description: "Choose the expert model through Pi's model registry",
+    async handler(_args, ctx) {
+      ensureInitialized(ctx);
+      try {
+        const result = await runRoleModelPicker({ ctx, config, role: "expert" });
+        await applySetupResult(result, ctx, { activateWorker: currentRole !== "expert" });
+        if (result && !result.cancelled && currentRole === "expert" && !result.loginProvider) {
+          await activateRole("expert", ctx);
+        }
+      } catch (error) {
+        notify(ctx, error instanceof Error ? error.message : String(error), "error");
+      }
+    }
+  });
+
+  pi.registerCommand("cascade-auth", {
+    description: "Prepare Pi's native /login flow for a provider",
+    async handler(args, ctx) {
+      ensureInitialized(ctx);
+      const requested = String(args || "").trim();
+      const preferred = requested || (currentRole === "expert" ? config.expert.provider : config.worker.provider);
+      const provider = requested || await chooseLoginProvider(ctx, preferred);
+      if (!provider) return;
+      prepareNativeLogin(ctx, provider);
+    }
+  });
+
+  pi.registerCommand("cascade-compaction", {
+    description: "Edit global Pi auto-compaction token limits",
+    async handler(_args, ctx) {
+      ensureInitialized(ctx);
+      try {
+        const result = await runGlobalCompactionWizard(ctx);
+        if (!result.cancelled) {
+          notify(ctx, `Global compaction limits saved in ${result.path}. Restart Cascade to apply them.`, "info");
+        }
+      } catch (error) {
+        notify(ctx, error instanceof Error ? error.message : String(error), "error");
+      }
+    }
+  });
+
+  pi.registerCommand("cascade-tools", {
+    description: "Show the active Pi tools and Cascade's parity baseline",
+    async handler(_args, ctx) {
+      ensureInitialized(ctx);
+      const current = snapshotPiSurface(pi);
+      notify(ctx, JSON.stringify({
+        activeTools: current.tools,
+        nativeToolsAtLoad: nativeSurfaceAtLoad.tools,
+        nativeCommandsAtLoad: nativeSurfaceAtLoad.commands,
+        restrictTools: Boolean((currentRole === "expert" ? config.expert : config.worker).restrictTools)
+      }, null, 2), "info");
+    }
+  });
+
+  pi.registerCommand("cascade-update", {
+    description: "Update Cascade from its GitHub source",
+    async handler(_args, ctx) {
+      ensureInitialized(ctx);
+      const invocation = buildUpdateInvocation();
+      const confirmed = await ctx.ui.confirm(
+        "Update Cascade?",
+        `${invocation.display}\n\nThe current session will keep running the loaded version. Restart Cascade after the update.`
+      );
+      if (!confirmed) return;
+      ctx.ui.setWorkingMessage("Updating Cascade from GitHub...");
+      try {
+        const result = await pi.exec(invocation.command, invocation.args, { cwd: ctx.cwd });
+        if (result.code !== 0) {
+          const details = truncateText(result.stderr || result.stdout || "unknown npm error", 4000);
+          return notify(ctx, `Cascade update failed (exit ${result.code}):\n${details}`, "error");
+        }
+        notify(ctx, "Cascade updated. Exit and run `cascade` again to load the new version.", "info");
+      } catch (error) {
+        notify(ctx, `Cascade update failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+      } finally {
+        ctx.ui.setWorkingMessage();
+      }
+    }
   });
 
   pi.registerCommand("cascade", {
@@ -850,7 +1175,16 @@ ${summarizeVerificationReport(report)}` }],
       const [action] = parseWords(args);
       if (action === "reload") {
         initialize(ctx);
-        await activateRole(currentRole === "expert" && config.mode === "dual" ? "expert" : "worker", ctx, { quiet: true });
+        try {
+          await activateRole(currentRole === "expert" && config.mode === "dual" ? "expert" : "worker", ctx, { quiet: true });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          config.worker = { ...config.worker, selectionMode: "native", thinkingMode: "native", restrictTools: false };
+          captureWorkerRuntime(ctx);
+          applyTools("worker", config.worker);
+          currentRole = "worker";
+          notify(ctx, `Cascade configuration reloaded; unavailable profile skipped and native Pi kept active: ${reason}`, "warning");
+        }
         notify(ctx, "Cascade configuration reloaded", "info");
       }
       const report = {
@@ -863,10 +1197,12 @@ ${summarizeVerificationReport(report)}` }],
         totals: ledger.totals(),
         privacy: {
           classification: config.privacy.classification,
-          worker: policyFor(config.worker),
+          worker: policyFor(activeModelConfig(ctx, config, "worker")),
           expert: config.mode === "dual" ? policyFor(config.expert) : undefined
         },
         harness: harness.manifest(),
+        compaction: getPiGlobalCompaction(),
+        activeTools: pi.getActiveTools?.() || [],
         configSources,
         blockedReason: blockedReason || null
       };

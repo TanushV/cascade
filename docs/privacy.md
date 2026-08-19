@@ -27,3 +27,7 @@ Use an external container, micro-VM, or policy sandbox for untrusted repositorie
 ## Project trust
 
 Project `.cascade/config.json`, project extensions, and project skills should be loaded only after Pi trusts the project. The wrapper recognizes `--approve` and passes it through to Pi. Non-interactive automation should set project trust deliberately rather than relying on an interactive prompt.
+
+## Operator access is never the policy target
+
+A policy failure blocks model inference or a sensitive tool call, not the terminal interface. Cascade must still start Pi and permit `/login`, `/model`, `/cascade-setup`, and other operator commands so the user can correct the configuration. Legacy disabled-Contributor defaults are migrated to native worker mode for this reason.

@@ -1,5 +1,17 @@
 # Architecture
 
+## Additive Pi integration
+
+Cascade's primary invariant is:
+
+```text
+Cascade capability surface >= native Pi capability surface
+```
+
+The `cascade` executable launches the pinned Pi runtime with the Cascade extension and otherwise leaves Pi's startup model selection, authentication, TUI, commands, sessions, extensions, and active worker tools intact.
+
+Cascade does **not** select a worker before the TUI opens. A fixed worker is activated after `session_start` only when the operator deliberately configured one. If that profile is unavailable or blocked, Cascade retains Pi's current model/tool surface and keeps `/login`, `/model`, and setup commands available.
+
 ## Three planes
 
 ```text
@@ -7,80 +19,74 @@ Immutable control plane
   privacy · credentials · hard budgets · protected paths · audit · rollback
 
 Task execution plane
-  worker · expert subprocess · evidence ledger · adaptive router · verification
+  native Pi worker · expert subprocess · evidence ledger · router · verification
 
 Harness learning plane
   scoped candidates · replay metrics · canary · promotion · rollback · retirement
 ```
 
-## Standalone runtime delivery
+## Runtime delivery
 
-Cascade declares `@earendil-works/pi-coding-agent@0.84.2` as a normal runtime dependency and resolves its exported package location from inside the installed Cascade package. Parent sessions, expert subprocesses, probes, and diagnostics all launch that packaged runtime directly. A global `pi` command is neither discovered nor required unless the operator explicitly supplies `--pi-bin` as a development override.
+Cascade declares `@earendil-works/pi-coding-agent@0.84.2` as a pinned runtime dependency and resolves it from its own installation. Parent sessions, expert subprocesses, probes, and diagnostics all use that runtime. A separately installed global `pi` command is not required.
 
-## Thin Pi integration
+## Worker ownership and tool parity
 
-Cascade uses Pi's supported extension surface for provider registration, model switching, lifecycle events, custom tools, commands, persistent session entries, project trust, and package loading. Pi's base agent loop and terminal UI remain upstream-owned.
-
-The wrapper performs the one operation an ordinary extension cannot perform before the first provider request: it selects the configured worker and injects the extension on process startup.
-
-## Workspace ownership
-
-The parent Pi session normally owns edits. Expert episodes are synchronous from the parent's perspective:
+The parent Pi session owns repository edits. By default, Cascade snapshots and preserves Pi's active tool surface, including tools from other extensions. It changes the active set only when the operator explicitly enables a restrictive role allowlist.
 
 ```text
-parent pauses
-  → checkpoint/evidence packet
-  → isolated child Pi process
-  → child exits
-  → parent records outcome and resumes
+native Pi tools
+      +
+Cascade controls
+      =
+worker tool surface
 ```
 
-Consultation, review, and investigation are forced read-only. An explicitly authorized takeover may edit with the expert's configured tools. This maintains one active workspace owner.
+A restricted role can be restored without losing the original Pi tools.
+
+## Worker model behavior
+
+The worker has two selection modes:
+
+- `native`: Pi's current model and `/model` picker remain authoritative;
+- `configured`: Cascade activates the exact configured provider/model after startup.
+
+Native mode is the default. Model and thinking-level changes made through Pi's TUI are tracked role-aware rather than overwritten.
 
 ## Expert process
 
-The child runs Pi's JSON event-stream mode with:
+Expert episodes run as isolated Pi JSON-mode subprocesses with:
 
 - exact provider and model;
 - exact thinking level;
-- bounded tool allowlist;
-- compact evidence JSON;
-- trust status;
-- custom provider shim;
-- timeout and output bounds.
+- a configurable tool list;
+- a compact evidence packet;
+- timeout and output bounds;
+- the same project-trust decision.
 
-Unavailable exact models fail closed. The runtime does not silently replace the expert with another provider/model.
+Consultation and review remove editing tools. A takeover is explicitly authorized and may edit only through the configured expert tool list. Only one process owns workspace edits at a time.
 
-## Evidence
+## Startup safety
 
-The append-only ledger stores bounded, redacted records of:
+Configuration, endpoint policy, or missing credentials may block **inference**, but must not block the operator from reaching the TUI.
 
-- goals;
-- tool calls and results;
-- route signals;
-- Git state;
-- checkpoints;
-- verifier results;
-- model usage and estimated cost;
-- expert episodes;
-- harness changes.
+The wrapper therefore injects only the extension. Configuration validation, legacy migration, model activation, and privacy checks happen after Pi has initialized. Invalid optional configuration falls back to native Pi with a warning.
 
-The handoff compiler progressively compacts data while preserving valid JSON and the most decision-relevant facts.
+## Evidence and routing
 
-## Routing
+The append-only ledger records goals, tool outcomes, route signals, Git state, checkpoints, verification, usage, expert episodes, and harness changes. Expert handoffs are bounded and redacted.
 
-The router accumulates decaying trajectory signals rather than classifying the initial prompt. Signals include repeated errors, verifier failures, explicit uncertainty, stale progress, large diffs, broad file spread, and protected-path attempts.
+The router scores trajectory evidence such as repeated failures, verifier failures, uncertainty, stale progress, large diffs, and protected-path attempts. Expert admission additionally checks cooldown and cost/call budgets.
 
-Weights and thresholds are configuration. Model names and programming languages do not appear in routing branches. Expert admission also checks cooldown, call count, expert cost, and total session cost.
+## Completion and compaction
 
-## Completion
+Repository changes invalidate previous completion proof. Cascade discovers and runs repository verification before settlement when configured.
 
-When a repository diff changes, the previous completion proof becomes stale. Before settlement, the runtime may discover and run repository verification commands. Completion is blocked when required checks fail or remain unverified after the configured gate limit.
+Cascade augments Pi's compaction summary with structured continuation state. Global token limits are stored in Pi's own `~/.pi/agent/settings.json`, so they apply to both Cascade and ordinary Pi sessions.
 
-## Harness learning
+## Updates
 
-Every trajectory records its harness manifest. Proposed prompt, memory, skill-description, or subagent-description edits remain inactive until evaluated. Process-local canaries cannot persist as promoted state by accident. Promotion writes versioned snapshots and supports rollback.
+`cascade update` resolves to the GitHub source and performs the global package update behind one stable command. `/cascade-update` performs the same operation through Pi's TUI and requires a restart to load the new code.
 
 ## Single mode
 
-Single mode uses the same task plane and simply denies expert admission. There is no alternate legacy runtime.
+Single mode is native Pi plus Cascade evidence/verification features. It denies expert admission but does not create a reduced alternative runtime.

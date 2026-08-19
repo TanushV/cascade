@@ -12,7 +12,7 @@ test("wrapper injects extension and fully configurable worker", () => {
   const dir = mkdtempSync(join(tmpdir(), "cascade-wrapper-"));
   const fake = join(dir, "fake-pi.mjs");
   const argsFile = join(dir, "args.json");
-  writeFileSync(fake, `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nwriteFileSync(process.env.FAKE_ARGS, JSON.stringify({ args: process.argv.slice(2), env: { workerTools: process.env.CASCADE_WORKER_TOOLS, expertTools: process.env.CASCADE_EXPERT_TOOLS, expertTimeout: process.env.CASCADE_EXPERT_TIMEOUT_MS, sessionCost: process.env.CASCADE_MAX_SESSION_COST_USD } }));\n`, "utf8");
+  writeFileSync(fake, `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nwriteFileSync(process.env.FAKE_ARGS, JSON.stringify({ args: process.argv.slice(2), env: { worker: process.env.CASCADE_WORKER, workerTools: process.env.CASCADE_WORKER_TOOLS, expertTools: process.env.CASCADE_EXPERT_TOOLS, expertTimeout: process.env.CASCADE_EXPERT_TIMEOUT_MS, sessionCost: process.env.CASCADE_MAX_SESSION_COST_USD } }));\n`, "utf8");
   chmodSync(fake, 0o755);
   const result = spawnSync(process.execPath, [
     join(root, "bin", "cascade.mjs"),
@@ -38,8 +38,10 @@ test("wrapper injects extension and fully configurable worker", () => {
   assert.notEqual(extensionIndex, -1);
   assert.equal(typeof args[extensionIndex + 1], "string");
   assert.ok(args[extensionIndex + 1].length > 0);
-  assert.deepEqual(args.slice(args.indexOf("--provider"), args.indexOf("--provider") + 4), ["--provider", "openrouter", "--model", "vendor/worker-model"]);
+  assert.equal(args.includes("--provider"), false, "Cascade must not force Pi's startup provider");
+  assert.equal(args.includes("--model"), false, "Cascade must not force Pi's startup model");
   assert.ok(args.includes("hello"));
+  assert.equal(captured.env.worker, "openrouter/vendor/worker-model");
   assert.equal(captured.env.workerTools, "read,grep,bash");
   assert.equal(captured.env.expertTools, "read,grep");
   assert.equal(captured.env.expertTimeout, "45000");
@@ -55,7 +57,7 @@ test("wrapper launches the packaged runtime without a global pi command", () => 
   const argsFile = join(dir, "args.json");
   mkdirSync(dist, { recursive: true });
   writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", version: "0.84.2" }));
-  writeFileSync(fake, `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nif (process.argv.includes('--version')) { console.log('pi 0.84.2-test'); process.exit(0); }\nwriteFileSync(process.env.FAKE_ARGS, JSON.stringify(process.argv.slice(2)));\n`, "utf8");
+  writeFileSync(fake, `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nif (process.argv.includes('--version')) { console.log('pi 0.84.2-test'); process.exit(0); }\nwriteFileSync(process.env.FAKE_ARGS, JSON.stringify({ args: process.argv.slice(2), worker: process.env.CASCADE_WORKER }));\n`, "utf8");
   chmodSync(fake, 0o755);
   const result = spawnSync(process.execPath, [
     join(root, "bin", "cascade.mjs"),
@@ -76,7 +78,9 @@ test("wrapper launches the packaged runtime without a global pi command", () => 
     encoding: "utf8"
   });
   assert.equal(result.status, 0, result.stderr);
-  const args = JSON.parse(readFileSync(argsFile, "utf8"));
-  assert.ok(args.includes("--extension"));
-  assert.ok(args.includes("vendor/worker-model"));
+  const captured = JSON.parse(readFileSync(argsFile, "utf8"));
+  assert.ok(captured.args.includes("--extension"));
+  assert.equal(captured.args.includes("--provider"), false);
+  assert.equal(captured.args.includes("--model"), false);
+  assert.equal(captured.worker, "openrouter/vendor/worker-model");
 });

@@ -66,7 +66,7 @@ try {
     files: ["dist"]
   }, null, 2)}\n`);
   writeFileSync(join(fakePiDir, "dist", "index.js"), "export const smokeRuntime = true;\n");
-  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst args = process.argv.slice(2);\nif (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }\nif (process.env.CASCADE_SMOKE_ARGS) writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify(args));\nconsole.log("pi smoke runtime");\n`);
+  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst args = process.argv.slice(2);\nif (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }\nif (process.env.CASCADE_SMOKE_ARGS) writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify({ args, worker: process.env.CASCADE_WORKER }));\nconsole.log("pi smoke runtime");\n`);
   chmodSync(join(fakePiDir, "dist", "cli.js"), 0o755);
 
   cpSync(packageRoot, gitSource, {
@@ -244,9 +244,14 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
     capture: true,
     env: { ...process.env, CASCADE_SMOKE_ARGS: argsPath, CASCADE_STATE_DIR: join(temporary, "state") }
   });
-  const spawnedArgs = JSON.parse(readFileSync(argsPath, "utf8"));
-  if (!spawnedArgs.includes("--extension") || !spawnedArgs.includes("vendor/smoke-worker")) {
-    throw new Error(`Standalone wrapper did not launch bundled Pi correctly: ${JSON.stringify(spawnedArgs)}`);
+  const spawned = JSON.parse(readFileSync(argsPath, "utf8"));
+  if (
+    !spawned.args.includes("--extension") ||
+    spawned.args.includes("--provider") ||
+    spawned.args.includes("--model") ||
+    spawned.worker !== "openrouter/vendor/smoke-worker"
+  ) {
+    throw new Error(`Standalone wrapper did not preserve native Pi startup correctly: ${JSON.stringify(spawned)}`);
   }
 
   console.log(`Standalone package and Git-source smoke tests passed: ${cascadeTarball}`);

@@ -2,31 +2,23 @@
   "schemaVersion": 1,
   "mode": "dual",
   "worker": {
-    "provider": "meta-model-api",
-    "model": "muse-spark-1.2-contributor",
+    "selectionMode": "native",
+    "thinkingMode": "native",
+    "provider": "openrouter",
+    "model": "current-pi-model",
     "thinking": "medium",
-    "tools": [
-      "read",
-      "grep",
-      "find",
-      "ls",
-      "bash",
-      "edit",
-      "write"
-    ],
+    "restrictTools": false,
+    "tools": ["read", "grep", "find", "ls", "bash", "edit", "write"],
     "instructions": ""
   },
   "expert": {
+    "selectionMode": "configured",
+    "thinkingMode": "configured",
     "provider": "openrouter",
-    "model": "openrouter/auto",
+    "model": "vendor/strong-model-id",
     "thinking": "high",
-    "tools": [
-      "read",
-      "grep",
-      "find",
-      "ls",
-      "bash"
-    ],
+    "restrictTools": true,
+    "tools": ["read", "grep", "find", "ls", "bash"],
     "timeoutMs": 600000,
     "maxOutputCharacters": 120000,
     "instructions": ""

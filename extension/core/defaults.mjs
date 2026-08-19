@@ -1,4 +1,4 @@
-export const PACKAGE_VERSION = "0.2.0";
+export const PACKAGE_VERSION = "0.3.0";
 export const CONFIG_SCHEMA_VERSION = 1;
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -6,16 +6,22 @@ export const DEFAULT_CONFIG = Object.freeze({
   mode: "dual",
   piBinary: "auto",
   worker: {
+    selectionMode: "native",
+    thinkingMode: "native",
     provider: "meta-model-api",
     model: "muse-spark-1.2-contributor",
     thinking: "medium",
+    restrictTools: false,
     tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
     instructions: ""
   },
   expert: {
+    selectionMode: "configured",
+    thinkingMode: "configured",
     provider: "openrouter",
     model: "openrouter/auto",
     thinking: "high",
+    restrictTools: false,
     tools: ["read", "grep", "find", "ls", "bash"],
     timeoutMs: 600000,
     maxOutputCharacters: 120000,
@@ -172,6 +178,8 @@ export const DEFAULT_CONFIG = Object.freeze({
 
 export const CONTRIBUTOR_CLASSIFICATIONS_ALLOWED_BY_DEFAULT = new Set(["public"]);
 export const VALID_MODES = new Set(["single", "dual"]);
+export const VALID_SELECTION_MODES = new Set(["native", "configured"]);
+export const VALID_THINKING_MODES = new Set(["native", "configured"]);
 export const VALID_THINKING_LEVELS = new Set([
   "off",
   "minimal",

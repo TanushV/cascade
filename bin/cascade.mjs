@@ -12,6 +12,8 @@ import { evaluateContributorPolicy } from "../extension/core/privacy.mjs";
 import { probeModelProfile } from "../extension/core/probe.mjs";
 import { runtimeSummary, spawnPi } from "../extension/core/pi-runtime.mjs";
 import { atomicWriteJson } from "../extension/core/util.mjs";
+import { getPiGlobalCompaction, writePiGlobalCompaction } from "../extension/core/pi-settings.mjs";
+import { runSelfUpdate } from "../extension/core/updater.mjs";
 
 const BIN_PATH = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = dirname(dirname(BIN_PATH));
@@ -30,6 +32,8 @@ Usage:
   cascade probe worker|expert [cascade options]
   cascade runtime
   cascade self-test
+  cascade compaction show|set [--enabled true|false] [--reserve-tokens N] [--keep-recent-tokens N]
+  cascade update|pull [--dry-run]
 
 Cascade options:
   --cascade-config FILE
@@ -137,7 +141,7 @@ function isProjectApproved(args) {
   return args.includes("--approve") || args.includes("-a") || ["1", "true", "yes"].includes(String(process.env.CASCADE_PROJECT_TRUSTED || "").toLowerCase());
 }
 
-function effectiveConfig({ cwd, parsed, passthrough }) {
+function effectiveConfig({ cwd, parsed, passthrough, throwOnError = true }) {
   const env = { ...process.env, ...parsed.env };
   const projectTrusted = isProjectApproved(passthrough);
   if (projectTrusted) env.CASCADE_PROJECT_TRUSTED = "1";
@@ -146,7 +150,7 @@ function effectiveConfig({ cwd, parsed, passthrough }) {
     projectTrusted,
     explicitPath: parsed.explicitConfig,
     env,
-    throwOnError: true
+    throwOnError
   });
   return { ...loaded, env, projectTrusted };
 }
@@ -154,28 +158,34 @@ function effectiveConfig({ cwd, parsed, passthrough }) {
 async function runPi(argv) {
   const parsed = parseCascadeOptions(argv);
   const cwd = process.cwd();
-  const loaded = effectiveConfig({ cwd, parsed, passthrough: parsed.passthrough });
-  const { config, env, projectTrusted } = loaded;
-  const workerPolicy = evaluateContributorPolicy(config, config.worker);
-  if (!workerPolicy.allowed) throw new Error(`Worker endpoint blocked: ${workerPolicy.reason}`);
-  if (config.mode === "dual") {
-    const expertPolicy = evaluateContributorPolicy(config, config.expert);
-    if (!expertPolicy.allowed) throw new Error(`Expert endpoint blocked: ${expertPolicy.reason}`);
+  let loaded;
+  let startupWarning = "";
+  try {
+    loaded = effectiveConfig({ cwd, parsed, passthrough: parsed.passthrough, throwOnError: false });
+    if (loaded.validation.errors.length) {
+      startupWarning = `Cascade configuration was ignored: ${loaded.validation.errors.join("; ")}`;
+      loaded = { ...loaded, config: structuredClone(DEFAULT_CONFIG) };
+    }
+  } catch (error) {
+    const env = { ...process.env, ...parsed.env };
+    const projectTrusted = isProjectApproved(parsed.passthrough);
+    if (projectTrusted) env.CASCADE_PROJECT_TRUSTED = "1";
+    loaded = { config: DEFAULT_CONFIG, env, projectTrusted };
+    startupWarning = `Cascade configuration could not be loaded: ${error instanceof Error ? error.message : String(error)}`;
   }
+  const { config, env, projectTrusted } = loaded;
   if (!existsSync(EXTENSION_PATH)) throw new Error(`Cascade extension is missing: ${EXTENSION_PATH}`);
 
-  const piArgs = [
-    "--extension", EXTENSION_PATH,
-    "--provider", config.worker.provider,
-    "--model", config.worker.model,
-    "--thinking", config.worker.thinking,
-    ...parsed.passthrough
-  ];
+  // Cascade must start like Pi. Model selection, authentication, privacy checks,
+  // and role activation happen inside the running TUI. Never reject startup
+  // merely because an optional worker/expert profile is unavailable.
+  const piArgs = ["--extension", EXTENSION_PATH, ...parsed.passthrough];
   const childEnv = {
     ...env,
     CASCADE_PACKAGE_ROOT: PACKAGE_ROOT,
     CASCADE_EXTENSION_PATH: EXTENSION_PATH,
-    CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0"
+    CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",
+    ...(startupWarning ? { CASCADE_STARTUP_WARNING: startupWarning } : {})
   };
   if (parsed.explicitConfig) childEnv.CASCADE_CONFIG = resolve(parsed.explicitConfig);
 
@@ -198,7 +208,7 @@ function parseCommandFlags(args) {
     const arg = args[i];
     if (!arg.startsWith("--")) { result.positional.push(arg); continue; }
     const key = arg.slice(2);
-    if (["force", "global", "approve", "expert-reviewed", "no-isolation"].includes(key)) result[key] = true;
+    if (["force", "global", "approve", "expert-reviewed", "no-isolation", "dry-run"].includes(key)) result[key] = true;
     else {
       result[key] = takeValue(args, i, arg);
       i += 1;
@@ -342,6 +352,45 @@ async function evalCommand(args) {
   if (report.accepted !== report.taskCount) process.exitCode = 1;
 }
 
+function parseBooleanFlag(value, name) {
+  if (value === undefined) return undefined;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  throw new Error(`${name} must be true or false`);
+}
+
+function compactionCommand(args) {
+  const flags = parseCommandFlags(args);
+  const [action = "show"] = flags.positional;
+  if (action === "show") {
+    console.log(JSON.stringify(getPiGlobalCompaction(), null, 2));
+    return;
+  }
+  if (action !== "set") {
+    throw new Error("Usage: cascade compaction show|set [--enabled true|false] [--reserve-tokens N] [--keep-recent-tokens N]");
+  }
+  const current = getPiGlobalCompaction();
+  const next = { ...current.compaction };
+  const enabled = parseBooleanFlag(flags.enabled, "--enabled");
+  if (enabled !== undefined) next.enabled = enabled;
+  if (flags["reserve-tokens"] !== undefined) next.reserveTokens = Number(flags["reserve-tokens"]);
+  if (flags["keep-recent-tokens"] !== undefined) next.keepRecentTokens = Number(flags["keep-recent-tokens"]);
+  const result = writePiGlobalCompaction(next);
+  console.log(JSON.stringify(result, null, 2));
+  console.log("Global compaction limits saved. They apply to new Cascade/Pi sessions.");
+}
+
+function updateCommand(args) {
+  const flags = parseCommandFlags(args);
+  const result = runSelfUpdate({ dryRun: Boolean(flags["dry-run"]) });
+  if (result.dryRun) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log("Cascade updated from GitHub. Start a new terminal session or run `rehash`, then check `cascade --version`.");
+}
+
 function runtimeCommand() {
   const summary = runtimeSummary({ piBinary: "auto" });
   console.log(JSON.stringify({ cascadeVersion: PACKAGE_VERSION, runtime: summary }, null, 2));
@@ -379,6 +428,8 @@ async function main() {
   }
   if (command === "runtime") return runtimeCommand();
   if (command === "self-test") return selfTestCommand();
+  if (command === "compaction") return compactionCommand(argv.slice(1));
+  if (command === "update" || command === "pull") return updateCommand(argv.slice(1));
   if (command === "init") return initCommand(argv.slice(1));
   if (command === "doctor") return doctorCommand(argv.slice(1));
   if (command === "config") return configCommand(argv.slice(1));

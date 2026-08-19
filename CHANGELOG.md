@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0 - 2026-08-19
+
+### Changed
+
+- Cascade now launches the native Pi TUI without preselecting or validating a worker endpoint before startup.
+- The worker defaults to Pi's current model and native `/model` picker.
+- Pi's active worker tools and commands are preserved unless the operator explicitly enables a role allowlist.
+- Model and thinking-level changes made in Pi are tracked by the active Cascade role instead of being overwritten.
+- Both worker and expert models, reasoning levels, and tool policies can be configured through the TUI.
+
+### Added
+
+- `/cascade-setup`, `/cascade-worker`, `/cascade-expert`, `/cascade-auth`, `/cascade-tools`, `/cascade-compaction`, and `/cascade-update`.
+- Global Pi compaction-limit editing through the TUI and `cascade compaction`.
+- One-command GitHub updates through `cascade update`.
+- Legacy 0.2 configuration migration.
+- Real pseudo-terminal tests using the bundled Pi TUI without provider credentials.
+- Regression coverage for the exact disabled-Contributor startup failure.
+
+### Fixed
+
+- A disallowed Contributor profile no longer prevents Cascade or Pi from opening.
+- Invalid or unavailable optional Cascade profiles fall back to native Pi with a warning.
+- Slash commands such as `/login`, `/model`, and `/cascade-setup` remain usable when inference policy blocks a selected endpoint.
+- Extension action APIs are no longer called before Pi initializes the extension runtime.
+- Expert and worker setup no longer requires hand-editing JSON.
+
 ## 0.2.0 - 2026-08-18
 
 ### Changed

@@ -6,7 +6,9 @@ import {
   DEFAULT_CONFIG,
   VALID_HARNESS_MODES,
   VALID_MODES,
-  VALID_THINKING_LEVELS
+  VALID_SELECTION_MODES,
+  VALID_THINKING_LEVELS,
+  VALID_THINKING_MODES
 } from "./defaults.mjs";
 import {
   deepClone,
@@ -15,6 +17,27 @@ import {
   parseModelReference,
   readJsonFile
 } from "./util.mjs";
+
+
+function migrateLegacyConfig(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const migrated = deepClone(raw);
+  if (migrated.worker && typeof migrated.worker === "object" && migrated.worker.selectionMode === undefined) {
+    const generatedContributorDefault =
+      migrated.worker.provider === "meta-model-api" &&
+      migrated.worker.model === "muse-spark-1.2-contributor" &&
+      migrated.privacy?.allowContributor !== true;
+    migrated.worker.selectionMode = generatedContributorDefault ? "native" : "configured";
+    migrated.worker.thinkingMode = generatedContributorDefault ? "native" : "configured";
+    migrated.worker.restrictTools = false;
+  }
+  if (migrated.expert && typeof migrated.expert === "object" && migrated.expert.selectionMode === undefined) {
+    migrated.expert.selectionMode = "configured";
+    migrated.expert.thinkingMode = "configured";
+    migrated.expert.restrictTools = false;
+  }
+  return migrated;
+}
 
 export function getGlobalConfigPath(env = process.env) {
   if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
@@ -72,23 +95,23 @@ export function environmentOverrides(env = process.env) {
   if (env.CASCADE_PI_BIN) result.piBinary = env.CASCADE_PI_BIN;
 
   const worker = parseModelReference(env.CASCADE_WORKER || "");
-  if (worker) result.worker = worker;
+  if (worker) result.worker = { ...worker, selectionMode: "configured", thinkingMode: "configured" };
   if (env.CASCADE_WORKER_THINKING) {
-    result.worker = { ...(result.worker || {}), thinking: env.CASCADE_WORKER_THINKING };
+    result.worker = { ...(result.worker || {}), thinking: env.CASCADE_WORKER_THINKING, thinkingMode: "configured" };
   }
   if (env.CASCADE_WORKER_TOOLS !== undefined) {
-    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS) };
+    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS), restrictTools: true };
   }
   if (env.CASCADE_WORKER_INSTRUCTIONS !== undefined) {
     result.worker = { ...(result.worker || {}), instructions: String(env.CASCADE_WORKER_INSTRUCTIONS) };
   }
   const expert = parseModelReference(env.CASCADE_EXPERT || "");
-  if (expert) result.expert = expert;
+  if (expert) result.expert = { ...expert, selectionMode: "configured", thinkingMode: "configured" };
   if (env.CASCADE_EXPERT_THINKING) {
-    result.expert = { ...(result.expert || {}), thinking: env.CASCADE_EXPERT_THINKING };
+    result.expert = { ...(result.expert || {}), thinking: env.CASCADE_EXPERT_THINKING, thinkingMode: "configured" };
   }
   if (env.CASCADE_EXPERT_TOOLS !== undefined) {
-    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS) };
+    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS), restrictTools: true };
   }
   if (env.CASCADE_EXPERT_INSTRUCTIONS !== undefined) {
     result.expert = { ...(result.expert || {}), instructions: String(env.CASCADE_EXPERT_INSTRUCTIONS) };
@@ -158,8 +181,15 @@ function validateModelConfig(model, label, errors) {
     errors.push(`${label} must be an object`);
     return;
   }
+  if (!VALID_SELECTION_MODES.has(model.selectionMode)) {
+    errors.push(`${label}.selectionMode must be one of ${[...VALID_SELECTION_MODES].join(", ")}`);
+  }
+  if (!VALID_THINKING_MODES.has(model.thinkingMode)) {
+    errors.push(`${label}.thinkingMode must be one of ${[...VALID_THINKING_MODES].join(", ")}`);
+  }
   if (typeof model.provider !== "string" || !model.provider.trim()) errors.push(`${label}.provider is required`);
   if (typeof model.model !== "string" || !model.model.trim()) errors.push(`${label}.model is required`);
+  if (typeof model.restrictTools !== "boolean") errors.push(`${label}.restrictTools must be boolean`);
   if (model.thinking !== undefined && !VALID_THINKING_LEVELS.has(model.thinking)) {
     errors.push(`${label}.thinking must be one of ${[...VALID_THINKING_LEVELS].join(", ")}`);
   }
@@ -228,7 +258,21 @@ export function validateConfig(config) {
 
 export function normalizeConfig(config) {
   const normalized = deepClone(config);
+  normalized.worker.selectionMode = VALID_SELECTION_MODES.has(normalized.worker.selectionMode)
+    ? normalized.worker.selectionMode
+    : DEFAULT_CONFIG.worker.selectionMode;
+  normalized.worker.thinkingMode = VALID_THINKING_MODES.has(normalized.worker.thinkingMode)
+    ? normalized.worker.thinkingMode
+    : DEFAULT_CONFIG.worker.thinkingMode;
+  normalized.worker.restrictTools = Boolean(normalized.worker.restrictTools);
   normalized.worker.tools = normalizeStringArray(normalized.worker.tools, DEFAULT_CONFIG.worker.tools);
+  normalized.expert.selectionMode = VALID_SELECTION_MODES.has(normalized.expert.selectionMode)
+    ? normalized.expert.selectionMode
+    : DEFAULT_CONFIG.expert.selectionMode;
+  normalized.expert.thinkingMode = VALID_THINKING_MODES.has(normalized.expert.thinkingMode)
+    ? normalized.expert.thinkingMode
+    : DEFAULT_CONFIG.expert.thinkingMode;
+  normalized.expert.restrictTools = Boolean(normalized.expert.restrictTools);
   normalized.expert.tools = normalizeStringArray(normalized.expert.tools, DEFAULT_CONFIG.expert.tools);
   normalized.privacy.denyPaths = normalizeStringArray(normalized.privacy.denyPaths, DEFAULT_CONFIG.privacy.denyPaths);
   normalized.routing.failureCommands = normalizeStringArray(
@@ -260,7 +304,7 @@ export function loadEffectiveConfig({
   const sources = [{ type: "defaults", path: null }];
 
   const globalPath = getGlobalConfigPath(env);
-  const globalConfig = readJsonFile(globalPath, { optional: true });
+  const globalConfig = migrateLegacyConfig(readJsonFile(globalPath, { optional: true }));
   if (globalConfig) {
     config = deepMerge(config, globalConfig);
     sources.push({ type: "global", path: globalPath });
@@ -268,7 +312,7 @@ export function loadEffectiveConfig({
 
   const projectPath = getProjectConfigPath(cwd, env);
   if (projectTrusted) {
-    const projectConfig = readJsonFile(projectPath, { optional: true });
+    const projectConfig = migrateLegacyConfig(readJsonFile(projectPath, { optional: true }));
     if (projectConfig) {
       config = deepMerge(config, projectConfig);
       sources.push({ type: "project", path: projectPath });
@@ -277,7 +321,7 @@ export function loadEffectiveConfig({
 
   if (explicitPath) {
     const resolved = resolve(explicitPath);
-    config = deepMerge(config, readJsonFile(resolved));
+    config = deepMerge(config, migrateLegacyConfig(readJsonFile(resolved)));
     sources.push({ type: "explicit", path: resolved });
   }
 
@@ -297,16 +341,22 @@ export function createExampleConfig() {
     schemaVersion: 1,
     mode: "dual",
     worker: {
+      selectionMode: "native",
+      thinkingMode: "native",
       provider: "meta-model-api",
       model: "muse-spark-1.2-contributor",
       thinking: "medium",
+      restrictTools: false,
       tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
       instructions: ""
     },
     expert: {
+      selectionMode: "configured",
+      thinkingMode: "configured",
       provider: "openrouter",
       model: "openrouter/auto",
       thinking: "high",
+      restrictTools: false,
       tools: ["read", "grep", "find", "ls", "bash"],
       timeoutMs: 600000,
       maxOutputCharacters: 120000,

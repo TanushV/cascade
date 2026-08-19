@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/pi-parity-tui
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,6 +14,7 @@ permissions:
 
 jobs:
   export:
+    if: github.head_ref == 'agent/pi-parity-tui' || github.ref_name == 'agent/pi-parity-tui'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

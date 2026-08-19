@@ -1,0 +1,48 @@
+name: Apply native Pi TUI parity v3
+
+on:
+  push:
+    branches:
+      - agent/native-pi-tui-parity
+    paths:
+      - .apply-native-tui-parity-v3
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-pi-tui-parity-v3
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/native-pi-tui-parity
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Integrate native Pi parity and TUI setup
+        run: node scripts/apply-native-tui-existing.mjs
+      - name: Validate source and real TUI
+        run: npm run ci
+      - name: Commit validated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .apply-native-tui-parity .apply-native-tui-parity-v2 .apply-native-tui-parity-v3
+          rm -f .finalize-native-tui-parity
+          rm -f scripts/apply-native-tui-parity.mjs scripts/apply-native-tui-existing.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Restore native Pi capabilities and add Cascade TUI setup"
+          git push origin HEAD:agent/native-pi-tui-parity

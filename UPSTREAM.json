@@ -4,7 +4,7 @@
   "codingAgentPackage": "@earendil-works/pi-coding-agent",
   "codingAgentVersion": "0.84.2",
   "integration": "Pi package and extension overlay using public extension APIs",
-  "cascadeVersion": "0.1.3",
+  "cascadeVersion": "0.2.0",
   "preparedOn": "2026-08-18",
   "runtimeDelivery": "npm dependency; no separate Pi install required"
 }

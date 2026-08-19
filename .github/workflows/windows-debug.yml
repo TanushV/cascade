@@ -1,0 +1,56 @@
+name: Windows CI diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.head_ref == 'ci-validation'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ci-validation
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Materialize verified source
+        shell: bash
+        run: node .bootstrap/materialize.mjs
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run suite and capture sanitized failure lines
+        id: suite
+        shell: bash
+        run: |
+          set +e
+          npm run ci > "$RUNNER_TEMP/ci-output.log" 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          {
+            echo "Windows CI status: $status"
+            grep -E "^(not ok|# Subtest:)|AssertionError|ERR_ASSERTION|Error:|FAILED|FAIL " "$RUNNER_TEMP/ci-output.log" | tail -n 120 || true
+          } > "$RUNNER_TEMP/windows-failure.log"
+          exit 0
+      - name: Commit sanitized diagnostic
+        if: steps.suite.outputs.status != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-debug
+          cp "$RUNNER_TEMP/windows-failure.log" .ci-debug/windows-failure.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .ci-debug/windows-failure.log
+          git commit -m "[skip ci] Capture sanitized Windows failure"
+          git push origin HEAD:ci-validation
+      - name: Fail when suite failed
+        if: steps.suite.outputs.status != '0'
+        shell: bash
+        run: exit 1

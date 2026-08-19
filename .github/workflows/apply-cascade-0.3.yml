@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .publish/source-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
+          cat .publish/chunk-* | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
           echo "78b36e6318866d69acdb8c58523c33a3bcf938b01d1bab85576b73cfde3c52d9  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
           mkdir -p "$RUNNER_TEMP/cascade-source"
           tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"

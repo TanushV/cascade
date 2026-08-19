@@ -43,22 +43,23 @@ jobs:
         run: npm run ci
 
   github-source-install:
-    name: Install exact pushed commit from GitHub
-    if: github.event_name == 'push'
+    name: Install exact repository commit from GitHub
     runs-on: macos-latest
     timeout-minutes: 15
     needs: test
+    env:
+      INSTALL_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
-      - name: Install and verify current commit
+      - name: Install and verify exact commit
         shell: bash
         run: |
           set -euo pipefail
           PREFIX="$RUNNER_TEMP/cascade-prefix"
-          npm install -g "git+https://github.com/${GITHUB_REPOSITORY}.git#${GITHUB_SHA}" \
+          npm install -g "git+https://github.com/${GITHUB_REPOSITORY}.git#${INSTALL_SHA}" \
             --prefix "$PREFIX" --ignore-scripts --no-audit --no-fund
           "$PREFIX/bin/cascade" --version
           "$PREFIX/bin/cascade" self-test

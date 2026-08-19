@@ -26,26 +26,42 @@ if (actual !== EXPECTED_SHA256) {
   throw new Error(`Pi Cascade source archive checksum mismatch: ${actual}`);
 }
 
+const copyChildren = async (from, to) => {
+  for (const name of await readdir(from)) {
+    await cp(join(from, name), join(to, name), {
+      recursive: true,
+      force: true,
+      preserveTimestamps: true,
+    });
+  }
+};
+
 const temp = await mkdtemp(join(tmpdir(), "pi-cascade-source-"));
 try {
-  const archivePath = join(temp, "source.tar.gz");
-  await writeFile(archivePath, archive);
-  const extract = spawnSync("tar", ["-xzf", archivePath, "-C", temp], {
-    cwd: root,
+  const archiveName = "source.tar.gz";
+  await writeFile(join(temp, archiveName), archive);
+
+  // Use paths relative to cwd. Git for Windows' tar treats `D:\\...` as a
+  // remote archive spec because of the drive-letter colon.
+  const extract = spawnSync("tar", ["-xzf", archiveName], {
+    cwd: temp,
     encoding: "utf8",
   });
   if (extract.status !== 0) {
     throw new Error(`Unable to extract Pi Cascade source: ${extract.stderr || extract.stdout}`);
   }
 
-  const source = join(temp, "source");
-  for (const name of await readdir(source)) {
-    await cp(join(source, name), join(root, name), {
-      recursive: true,
-      force: true,
-      preserveTimestamps: true,
-    });
+  await copyChildren(join(temp, "source"), root);
+
+  // Small, reviewable overlays hold fixes discovered by cross-platform CI
+  // after the large source archive was signed. They are committed as ordinary
+  // source files and applied deterministically after the verified base tree.
+  try {
+    await copyChildren(join(bootstrapDir, "overlays"), root);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
   }
+
   await chmod(join(root, "bin", "pi-cascade.mjs"), 0o755);
   process.stdout.write("Materialized verified Pi Cascade source tree.\n");
 } finally {

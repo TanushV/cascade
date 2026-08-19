@@ -1,12 +1,10 @@
-name: One-time source bootstrap
+name: Materialize verified source tree
 
 on:
   push:
     branches: [main]
     paths:
       - ".bootstrap/READY"
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -29,7 +27,17 @@ jobs:
           rm -rf /tmp/pi-cascade-source
           mkdir -p /tmp/pi-cascade-source
           tar -xzf /tmp/pi-cascade-source.tar.gz -C /tmp/pi-cascade-source
-          rsync -a --delete --exclude=.git /tmp/pi-cascade-source/source/ ./
+          # Preserve publication infrastructure authored directly in GitHub.
+          # The archive contains the complete application source but not the
+          # permanent CI, release, CodeQL, Dependabot, or issue-template files.
+          rsync -a --delete \
+            --exclude=.git \
+            --exclude=.bootstrap \
+            --exclude=.github \
+            /tmp/pi-cascade-source/source/ ./
+          if [[ -d .bootstrap/overlays ]]; then
+            rsync -a .bootstrap/overlays/ ./
+          fi
       - name: Commit materialized source
         shell: bash
         run: |
@@ -37,5 +45,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
-          git commit -m "Materialize tested Pi Cascade source"
+          if git diff --cached --quiet; then
+            echo "Source tree is already materialized."
+            exit 0
+          fi
+          git commit -m "Materialize verified Pi Cascade source"
           git push origin HEAD:main

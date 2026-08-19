@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - ".bootstrap/READY"
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   materialize:
+    if: ${{ hashFiles('.bootstrap/READY') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

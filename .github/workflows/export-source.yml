@@ -1,0 +1,27 @@
+name: Export source snapshot
+
+on:
+  push:
+    branches:
+      - agent/pi-parity-tui
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git --exclude=node_modules --exclude=dist -czf cascade-source.tgz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cascade-source
+          path: cascade-source.tgz
+          if-no-files-found: error
+          retention-days: 1

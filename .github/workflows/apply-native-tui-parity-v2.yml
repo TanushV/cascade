@@ -1,0 +1,70 @@
+name: Apply native Pi TUI parity v2
+
+on:
+  push:
+    branches:
+      - agent/native-pi-tui-parity
+    paths:
+      - .apply-native-tui-parity-v2
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-pi-tui-parity-v2
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/native-pi-tui-parity
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Generate parity and TUI changes
+        run: node scripts/apply-native-tui-parity.mjs
+      - name: Correct extension-factory helper scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+          const path = "extension/index.mjs";
+          let text = await readFile(path, "utf8");
+          const startMarker = "\n  function captureWorkerRuntime(ctx) {";
+          const endMarker = "\nfunction formatStatus(";
+          const start = text.indexOf(startMarker);
+          const end = text.indexOf(endMarker, start);
+          if (start < 0 || end < 0) throw new Error("Generated top-level parity helper block was not found");
+          const helperBlock = text.slice(start + 1, end).trimEnd();
+          text = `${text.slice(0, start)}${text.slice(end)}`;
+          const stateMarker = "  const toolPolicyState = createToolPolicyState();";
+          if (!text.includes(stateMarker)) throw new Error("Extension factory state marker was not found");
+          text = text.replace(stateMarker, `${stateMarker}\n\n${helperBlock}`);
+          await writeFile(path, text, "utf8");
+          NODE
+          node --check extension/index.mjs
+      - name: Run complete validation suite
+        run: npm run ci
+      - name: Commit validated source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .apply-native-tui-parity
+          rm -f .apply-native-tui-parity-v2
+          rm -f .finalize-native-tui-parity
+          rm -f scripts/apply-native-tui-parity.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Restore native Pi capabilities and add Cascade TUI setup"
+          git push origin HEAD:agent/native-pi-tui-parity

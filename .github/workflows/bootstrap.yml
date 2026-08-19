@@ -27,7 +27,14 @@ jobs:
           rm -rf /tmp/pi-cascade-source
           mkdir -p /tmp/pi-cascade-source
           tar -xzf /tmp/pi-cascade-source.tar.gz -C /tmp/pi-cascade-source
-          rsync -a --delete --exclude=.git --exclude=.bootstrap /tmp/pi-cascade-source/source/ ./
+          # Preserve publication infrastructure authored directly in GitHub.
+          # The archive contains the complete application source but not the
+          # permanent CI, release, CodeQL, Dependabot, or issue-template files.
+          rsync -a --delete \
+            --exclude=.git \
+            --exclude=.bootstrap \
+            --exclude=.github \
+            /tmp/pi-cascade-source/source/ ./
           if [[ -d .bootstrap/overlays ]]; then
             rsync -a .bootstrap/overlays/ ./
           fi

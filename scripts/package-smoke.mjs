@@ -22,10 +22,12 @@ mkdirSync(globalPrefix, { recursive: true });
 mkdirSync(gitPrefix, { recursive: true });
 
 function run(executable, args, options = {}) {
+  const needsShell = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
   return execFileSync(executable, args, {
     encoding: "utf8",
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    ...options
+    ...options,
+    shell: options.shell ?? needsShell
   });
 }
 

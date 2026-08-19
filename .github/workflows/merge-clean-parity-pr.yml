@@ -1,0 +1,76 @@
+name: Merge clean Pi parity PR after all checks
+
+on:
+  push:
+    branches:
+      - agent/pi-parity-tui
+    paths:
+      - .merge-clean-parity-pr
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cascade-clean-parity-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_PR: "9"
+    steps:
+      - name: Wait for every release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED=(
+            "Node 22.19.0 on ubuntu-latest"
+            "Node 24 on ubuntu-latest"
+            "Node 22.19.0 on macos-latest"
+            "Node 22.19.0 on windows-latest"
+            "Install exact repository commit from GitHub"
+            "Analyze JavaScript"
+            "Native Pi TUI parity"
+          )
+
+          HEAD_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${TARGET_PR}" --jq .head.sha)"
+          for attempt in $(seq 1 120); do
+            JSON="$(gh api -H 'Accept: application/vnd.github+json' "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs?per_page=100")"
+            echo "Attempt ${attempt}:"
+            echo "$JSON" | jq -r '.check_runs[] | "  \(.name): \(.status) / \(.conclusion // "pending")"'
+
+            missing=0
+            pending=0
+            failed=0
+            for name in "${EXPECTED[@]}"; do
+              count="$(echo "$JSON" | jq --arg name "$name" '[.check_runs[] | select(.name == $name)] | length')"
+              if [[ "$count" == "0" ]]; then
+                missing=1
+                continue
+              fi
+              status="$(echo "$JSON" | jq -r --arg name "$name" '[.check_runs[] | select(.name == $name)] | last | .status')"
+              conclusion="$(echo "$JSON" | jq -r --arg name "$name" '[.check_runs[] | select(.name == $name)] | last | (.conclusion // "pending")')"
+              if [[ "$status" != "completed" ]]; then pending=1; fi
+              if [[ "$status" == "completed" && ! "$conclusion" =~ ^(success|neutral|skipped)$ ]]; then failed=1; fi
+            done
+
+            if [[ "$failed" == "1" ]]; then
+              echo "A required Cascade check failed. Refusing to merge."
+              exit 1
+            fi
+            if [[ "$missing" == "0" && "$pending" == "0" ]]; then
+              gh pr comment "$TARGET_PR" --body "All Cascade 0.3.0 release gates passed: Linux Node 22/24, macOS, Windows, exact GitHub-source install, native PTY TUI parity, and CodeQL. Merging automatically."
+              gh pr merge "$TARGET_PR" --squash --admin --delete-branch
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for the complete check set."
+          exit 1

@@ -7,8 +7,8 @@ import { createExampleConfig, loadEffectiveConfig, validateConfig } from "../ext
 
 test("configuration merges trusted project and environment overrides", () => {
   const cwd = mkdtempSync(join(tmpdir(), "cascade-config-"));
-  mkdirSync(join(cwd, ".pi"));
-  writeFileSync(join(cwd, ".pi", "cascade.json"), JSON.stringify({
+  mkdirSync(join(cwd, ".cascade"));
+  writeFileSync(join(cwd, ".cascade", "config.json"), JSON.stringify({
     schemaVersion: 1,
     mode: "dual",
     worker: { provider: "project", model: "worker" },
@@ -50,8 +50,8 @@ test("configuration merges trusted project and environment overrides", () => {
 
 test("untrusted project configuration is ignored", () => {
   const cwd = mkdtempSync(join(tmpdir(), "cascade-untrusted-"));
-  mkdirSync(join(cwd, ".pi"));
-  writeFileSync(join(cwd, ".pi", "cascade.json"), JSON.stringify({
+  mkdirSync(join(cwd, ".cascade"));
+  writeFileSync(join(cwd, ".cascade", "config.json"), JSON.stringify({
     schemaVersion: 1,
     worker: { provider: "malicious", model: "redirect" }
   }));

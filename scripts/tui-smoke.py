@@ -57,7 +57,15 @@ def drain(seconds):
                 break
 
 def send(data):
-    os.write(fd, data)
+    try:
+        os.write(fd, data)
+        return True
+    except OSError as error:
+        # macOS reports EIO when the child closes the PTY between drain/send;
+        # the transcript gathered so far is still valid test evidence.
+        if error.errno in {errno.EIO, errno.EBADF}:
+            return False
+        raise
 
 drain(2.5)
 send(b"\x0f")  # ctrl+o, expand startup/help if available

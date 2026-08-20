@@ -1,4 +1,4 @@
-name: Materialize Cascade 0.4
+name: Diagnose Cascade 0.4 materialization
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  materialize:
+  diagnose:
     if: github.head_ref == 'agent/cascade-0.4-release'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -23,32 +23,52 @@ jobs:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Reconstruct, validate, and publish the tested source tree
+      - name: Record every reconstruction stage
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          set -o pipefail
+          exec > >(tee .publish/diagnostic.txt) 2>&1
 
-          cat .publish/current-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"
-          echo "f3817e3b59825bef1b944c09e706dd73c8c163cc46d0a0a4340bfea3a64128b3  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict
-          gunzip -c "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch"
-          git apply --binary \
-            --exclude=.export-source \
-            --exclude=.github/workflows/export-source.yml \
-            "$RUNNER_TEMP/cascade.patch"
+          stage() {
+            local name="$1"
+            shift
+            echo "===== $name ====="
+            "$@"
+            local code=$?
+            echo "STATUS $name=$code"
+            return 0
+          }
 
-          cat .publish/new-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-new-files.tar.gz"
-          echo "7ac419cbb8ee41c9760d280f6ea97bc8540a41bc343832c1ff20578102bac6fa  $RUNNER_TEMP/cascade-new-files.tar.gz" | sha256sum --check --strict
-          tar -xzf "$RUNNER_TEMP/cascade-new-files.tar.gz" -C .
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "BASE_FILES=$(git ls-files | wc -l)"
+          ls -l .publish
 
-          rm -rf .publish
-          rm -f .github/workflows/materialize-cascade-0.4.yml
+          stage concatenate_patch bash -c 'cat .publish/current-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"'
+          stage patch_digest sha256sum "$RUNNER_TEMP/cascade.patch.gz"
+          stage patch_digest_check bash -c 'echo "f3817e3b59825bef1b944c09e706dd73c8c163cc46d0a0a4340bfea3a64128b3  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict'
+          stage decompress_patch gunzip -c "$RUNNER_TEMP/cascade.patch.gz"
+          gunzip -c "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch" 2>>.publish/diagnostic.txt
+          echo "STATUS write_patch=$?"
+          stage apply_check git apply --check --binary --exclude=.export-source --exclude=.github/workflows/export-source.yml "$RUNNER_TEMP/cascade.patch"
+          stage apply_patch git apply --binary --exclude=.export-source --exclude=.github/workflows/export-source.yml "$RUNNER_TEMP/cascade.patch"
 
-          npm ci --ignore-scripts --no-audit --no-fund
-          python3 -m pip install --user pexpect
-          npm run ci
+          stage concatenate_new bash -c 'cat .publish/new-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-new-files.tar.gz"'
+          stage new_digest sha256sum "$RUNNER_TEMP/cascade-new-files.tar.gz"
+          stage new_digest_check bash -c 'echo "7ac419cbb8ee41c9760d280f6ea97bc8540a41bc343832c1ff20578102bac6fa  $RUNNER_TEMP/cascade-new-files.tar.gz" | sha256sum --check --strict'
+          stage list_new tar -tzf "$RUNNER_TEMP/cascade-new-files.tar.gz"
+          stage extract_new tar -xzf "$RUNNER_TEMP/cascade-new-files.tar.gz" -C .
 
+          stage node_version node --version
+          stage npm_version npm --version
+          stage npm_ci npm ci --ignore-scripts --no-audit --no-fund
+          stage install_pexpect python3 -m pip install --user pexpect
+          stage full_ci npm run ci
+
+          git reset --quiet
+          git add .publish/diagnostic.txt
           git config user.name "TanushV"
           git config user.email "87838540+TanushV@users.noreply.github.com"
-          git add -A
-          git commit -m "Ship isolated Cascade 0.4 application"
+          git commit -m "Record Cascade 0.4 materialization diagnostics"
           git push origin HEAD:agent/cascade-0.4-release
+          exit 0

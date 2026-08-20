@@ -1,0 +1,42 @@
+name: Materialize Cascade 0.4
+
+on:
+  push:
+    branches:
+      - agent/cascade-0.4-release
+    paths:
+      - .publish/READY
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-release
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Replace the branch with the tested source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .publish/source-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
+          echo "b20cfb024b25d32044acd6f93bb9973c792f1a3845fdef4f1ada3eaf857f6ed5  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/cascade-source"
+          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
+          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run ci
+          git config user.name "TanushV"
+          git config user.email "87838540+TanushV@users.noreply.github.com"
+          git add -A
+          git commit -m "Ship isolated Cascade 0.4 application"
+          git push origin HEAD:agent/cascade-0.4-release

@@ -1,0 +1,28 @@
+name: Export Cascade release branch
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.head_ref == 'agent/cascade-0.4-release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-release
+      - name: Archive exact branch tree
+        shell: bash
+        run: tar --exclude=.git -czf "$RUNNER_TEMP/cascade-live-branch.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cascade-live-branch
+          path: ${{ runner.temp }}/cascade-live-branch.tar.gz
+          retention-days: 1
+          if-no-files-found: error

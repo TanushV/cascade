@@ -1,17 +1,16 @@
 name: Materialize Cascade 0.4
 
 on:
-  push:
-    branches:
-      - agent/cascade-0.4-release
-    paths:
-      - .publish/READY
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   materialize:
+    if: github.head_ref == 'agent/cascade-0.4-release'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -24,17 +23,30 @@ jobs:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Replace the branch with the tested source tree
+      - name: Reconstruct, validate, and publish the tested source tree
         shell: bash
         run: |
           set -euo pipefail
-          cat .publish/source-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
-          echo "b20cfb024b25d32044acd6f93bb9973c792f1a3845fdef4f1ada3eaf857f6ed5  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
-          mkdir -p "$RUNNER_TEMP/cascade-source"
-          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
-          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+
+          cat .publish/patch-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"
+          echo "f3817e3b59825bef1b944c09e706dd73c8c163cc46d0a0a4340bfea3a64128b3  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict
+          gunzip -c "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch"
+          git apply --binary \
+            --exclude=.export-source \
+            --exclude=.github/workflows/export-source.yml \
+            "$RUNNER_TEMP/cascade.patch"
+
+          cat .publish/new-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-new-files.tar.gz"
+          echo "7ac419cbb8ee41c9760d280f6ea97bc8540a41bc343832c1ff20578102bac6fa  $RUNNER_TEMP/cascade-new-files.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/cascade-new-files.tar.gz" -C .
+
+          rm -rf .publish
+          rm -f .github/workflows/materialize-cascade-0.4.yml
+
           npm ci --ignore-scripts --no-audit --no-fund
+          python3 -m pip install --user pexpect
           npm run ci
+
           git config user.name "TanushV"
           git config user.email "87838540+TanushV@users.noreply.github.com"
           git add -A

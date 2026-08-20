@@ -32,8 +32,15 @@ function truncateAnsi(value, width) {
 function modelLabel(ctx) {
   const provider = ctx.model?.provider;
   const id = ctx.model?.id || ctx.model?.model || ctx.model?.modelId;
-  if (!provider || !id || provider === "unknown" || id === "unknown") return "no model · /login · /model";
+  if (!provider || !id || provider === "unknown" || id === "unknown") return "no model";
   return `${provider}/${id}`;
+}
+
+function headerModelHint(ctx) {
+  const model = modelLabel(ctx);
+  return model === "no model"
+    ? "no model · /login · /model · /cascade-setup"
+    : `${model} · /model · /cascade-setup`;
 }
 
 export function parseCascadeRuntimeStatus(value) {
@@ -76,7 +83,7 @@ export default function cascadeApplication(pi) {
         const name = theme.fg("accent", theme.bold("Cascade"));
         const version = theme.fg("dim", `v${PACKAGE_VERSION}`);
         const line1 = `${name} ${version}`;
-        const line2 = theme.fg("muted", `${modelLabel(ctx)} · /model · /cascade-setup`);
+        const line2 = theme.fg("muted", headerModelHint(ctx));
         return [truncateAnsi(line1, width), truncateAnsi(line2, width), ""];
       },
       invalidate() {}

@@ -38,7 +38,10 @@ test("wrapper injects extension and fully configurable worker", () => {
   assert.notEqual(extensionIndex, -1);
   assert.equal(typeof args[extensionIndex + 1], "string");
   assert.ok(args[extensionIndex + 1].length > 0);
-  assert.deepEqual(args.slice(args.indexOf("--provider"), args.indexOf("--provider") + 4), ["--provider", "openrouter", "--model", "vendor/worker-model"]);
+  assert.equal(args.includes("--provider"), false);
+  assert.equal(args.includes("--model"), false);
+  assert.ok(args.includes("--no-extensions"));
+  assert.ok(args.includes("--no-skills"));
   assert.ok(args.includes("hello"));
   assert.equal(captured.env.workerTools, "read,grep,bash");
   assert.equal(captured.env.expertTools, "read,grep");
@@ -78,5 +81,6 @@ test("wrapper launches the packaged runtime without a global pi command", () => 
   assert.equal(result.status, 0, result.stderr);
   const args = JSON.parse(readFileSync(argsFile, "utf8"));
   assert.ok(args.includes("--extension"));
-  assert.ok(args.includes("vendor/worker-model"));
+  assert.equal(args.includes("vendor/worker-model"), false);
+  assert.ok(args.includes("--no-extensions"));
 });

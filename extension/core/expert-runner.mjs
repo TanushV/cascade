@@ -6,6 +6,7 @@ import { redactSecrets } from "./privacy.mjs";
 import { truncateText } from "./util.mjs";
 import { providerCostFor } from "./providers.mjs";
 import { spawnPi } from "./pi-runtime.mjs";
+import { getCascadeAgentDir, getCascadeSessionDir } from "./cascade-paths.mjs";
 
 export function composeExpertPrompt({ mode, question, evidenceJson, instructions = "" }) {
   const access = mode === "consult"
@@ -84,6 +85,8 @@ export async function runExpertEpisode({
         cwd,
         env: {
           ...process.env,
+          PI_CODING_AGENT_DIR: getCascadeAgentDir(),
+          PI_CODING_AGENT_SESSION_DIR: getCascadeSessionDir(),
           CASCADE_CHILD: "1",
           CASCADE_CONFIG: configPath,
           CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",

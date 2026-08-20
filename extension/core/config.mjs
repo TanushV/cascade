@@ -6,6 +6,7 @@ import {
   DEFAULT_CONFIG,
   VALID_HARNESS_MODES,
   VALID_MODES,
+  VALID_SELECTION_MODES,
   VALID_THINKING_LEVELS
 } from "./defaults.mjs";
 import {
@@ -18,7 +19,8 @@ import {
 
 export function getGlobalConfigPath(env = process.env) {
   if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
-  const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(homedir(), ".config");
+  const home = env.HOME ? resolve(env.HOME) : homedir();
+  const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(home, ".config");
   return join(configHome, "cascade", "config.json");
 }
 
@@ -72,23 +74,23 @@ export function environmentOverrides(env = process.env) {
   if (env.CASCADE_PI_BIN) result.piBinary = env.CASCADE_PI_BIN;
 
   const worker = parseModelReference(env.CASCADE_WORKER || "");
-  if (worker) result.worker = worker;
+  if (worker) result.worker = { ...worker, selectionMode: "configured", thinkingMode: "configured" };
   if (env.CASCADE_WORKER_THINKING) {
     result.worker = { ...(result.worker || {}), thinking: env.CASCADE_WORKER_THINKING };
   }
   if (env.CASCADE_WORKER_TOOLS !== undefined) {
-    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS) };
+    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS), restrictTools: true };
   }
   if (env.CASCADE_WORKER_INSTRUCTIONS !== undefined) {
     result.worker = { ...(result.worker || {}), instructions: String(env.CASCADE_WORKER_INSTRUCTIONS) };
   }
   const expert = parseModelReference(env.CASCADE_EXPERT || "");
-  if (expert) result.expert = expert;
+  if (expert) result.expert = { ...expert, selectionMode: "configured", thinkingMode: "configured" };
   if (env.CASCADE_EXPERT_THINKING) {
     result.expert = { ...(result.expert || {}), thinking: env.CASCADE_EXPERT_THINKING };
   }
   if (env.CASCADE_EXPERT_TOOLS !== undefined) {
-    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS) };
+    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS), restrictTools: true };
   }
   if (env.CASCADE_EXPERT_INSTRUCTIONS !== undefined) {
     result.expert = { ...(result.expert || {}), instructions: String(env.CASCADE_EXPERT_INSTRUCTIONS) };
@@ -158,8 +160,18 @@ function validateModelConfig(model, label, errors) {
     errors.push(`${label} must be an object`);
     return;
   }
-  if (typeof model.provider !== "string" || !model.provider.trim()) errors.push(`${label}.provider is required`);
-  if (typeof model.model !== "string" || !model.model.trim()) errors.push(`${label}.model is required`);
+  const selectionMode = model.selectionMode || (label === "worker" ? "native" : "configured");
+  if (!VALID_SELECTION_MODES.has(selectionMode)) errors.push(`${label}.selectionMode must be native or configured`);
+  if (selectionMode === "configured") {
+    if (typeof model.provider !== "string" || !model.provider.trim()) errors.push(`${label}.provider is required`);
+    if (typeof model.model !== "string" || !model.model.trim()) errors.push(`${label}.model is required`);
+  }
+  if (model.thinkingMode !== undefined && !VALID_SELECTION_MODES.has(model.thinkingMode)) {
+    errors.push(`${label}.thinkingMode must be native or configured`);
+  }
+  if (model.restrictTools !== undefined && typeof model.restrictTools !== "boolean") {
+    errors.push(`${label}.restrictTools must be boolean`);
+  }
   if (model.thinking !== undefined && !VALID_THINKING_LEVELS.has(model.thinking)) {
     errors.push(`${label}.thinking must be one of ${[...VALID_THINKING_LEVELS].join(", ")}`);
   }
@@ -228,7 +240,13 @@ export function validateConfig(config) {
 
 export function normalizeConfig(config) {
   const normalized = deepClone(config);
+  normalized.worker.selectionMode = normalized.worker.selectionMode || "native";
+  normalized.worker.thinkingMode = normalized.worker.thinkingMode || (normalized.worker.selectionMode === "configured" ? "configured" : "native");
+  normalized.worker.restrictTools = normalized.worker.restrictTools === true;
   normalized.worker.tools = normalizeStringArray(normalized.worker.tools, DEFAULT_CONFIG.worker.tools);
+  normalized.expert.selectionMode = normalized.expert.selectionMode || "configured";
+  normalized.expert.thinkingMode = normalized.expert.thinkingMode || "configured";
+  normalized.expert.restrictTools = normalized.expert.restrictTools === true;
   normalized.expert.tools = normalizeStringArray(normalized.expert.tools, DEFAULT_CONFIG.expert.tools);
   normalized.privacy.denyPaths = normalizeStringArray(normalized.privacy.denyPaths, DEFAULT_CONFIG.privacy.denyPaths);
   normalized.routing.failureCommands = normalizeStringArray(
@@ -295,33 +313,32 @@ export function loadEffectiveConfig({
 export function createExampleConfig() {
   return {
     schemaVersion: 1,
-    mode: "dual",
+    mode: "single",
     worker: {
-      provider: "meta-model-api",
-      model: "muse-spark-1.2-contributor",
+      selectionMode: "native",
+      thinkingMode: "native",
+      restrictTools: false,
+      provider: "openrouter",
+      model: "openrouter/auto",
       thinking: "medium",
       tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
       instructions: ""
     },
     expert: {
+      selectionMode: "configured",
+      thinkingMode: "configured",
+      restrictTools: false,
       provider: "openrouter",
       model: "openrouter/auto",
       thinking: "high",
-      tools: ["read", "grep", "find", "ls", "bash"],
+      tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
       timeoutMs: 600000,
       maxOutputCharacters: 120000,
       instructions: ""
     },
-    privacy: {
-      classification: "unknown",
-      allowContributor: false
-    },
-    routing: {
-      autoConsult: true
-    },
-    harnessLearning: {
-      mode: "observe"
-    },
+    privacy: { classification: "unknown", allowContributor: false },
+    routing: { autoConsult: false },
+    harnessLearning: { mode: "observe" },
     workspaceRuntime: {
       enabled: false,
       pythonBinary: "python3",

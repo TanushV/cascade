@@ -1,7 +1,7 @@
 {
   "name": "cascade",
-  "version": "0.2.0",
-  "description": "Independent configurable one- or two-model, evidence-centered coding agent powered by the Pi runtime",
+  "version": "0.4.0",
+  "description": "Cascade coding agent with isolated state, native TUI, and configurable worker/expert orchestration on the Pi engine",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -33,11 +33,6 @@
     "CONTRIBUTING.md",
     "SECURITY.md"
   ],
-  "pi": {
-    "extensions": [
-      "./extension/index.mjs"
-    ]
-  },
   "engines": {
     "node": ">=22.19.0"
   },
@@ -49,7 +44,8 @@
     "pack:local": "npm pack --ignore-scripts",
     "release:local": "node scripts/release-local.mjs",
     "legal:check": "node scripts/check-legal.mjs",
-    "ci": "npm test && npm run check && npm run brand:check && npm run legal:check && npm run smoke"
+    "ci": "npm test && npm run check && npm run brand:check && npm run legal:check && npm run smoke",
+    "tui:smoke": "python3 scripts/tui-smoke.py"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.84.2"

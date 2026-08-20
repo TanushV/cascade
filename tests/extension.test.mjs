@@ -53,7 +53,7 @@ test("extension initializes single-model worker and records route evidence", asy
   writeFileSync(configPath, JSON.stringify({
     schemaVersion: 1,
     mode: "single",
-    worker: { provider: "openrouter", model: "worker-model", thinking: "low", tools: ["read", "bash", "edit"] },
+    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker-model", thinking: "low", tools: ["read", "bash", "edit"] },
     privacy: { classification: "internal", allowContributor: false }
   }));
   process.env.CASCADE_CONFIG = configPath;
@@ -84,7 +84,7 @@ test("extension initializes single-model worker and records route evidence", asy
   await emit(mock, "tool_result", { toolName: "bash", input: { command: "npm test" }, content: [{ type: "text", text: "tests failed" }], isError: true, details: { exitCode: 1 }, toolCallId: "1" }, ctx);
   const route = await mock.tools.get("cascade_route").execute("x", { refreshRepository: false }, undefined, undefined, ctx);
   assert.match(route.content[0].text, /toolError/);
-  assert.ok(mock.statuses.get("cascade").includes("cascade:single"));
+  assert.match(mock.statuses.get("cascade"), /^worker · single · route /);
 
   delete process.env.CASCADE_CONFIG;
   delete process.env.CASCADE_STATE_DIR;

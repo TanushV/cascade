@@ -1,67 +1,49 @@
-# Cascade 0.2.0 Test Report
+# Cascade 0.4.0 Test Report
 
-Prepared on 2026-08-18.
+## Scope
 
-## Local validation results
+This release converts Cascade from a Pi wrapper with shared state into an isolated application built on the Pi engine. The validation focuses on startup, application identity, state separation, real tool use, packaging, updates, compaction, and the worker/expert orchestration layer.
 
-| Check | Result |
-|---|---:|
-| Automated tests | **45 passed, 0 failed** |
-| Static syntax/import checks | **42 JavaScript modules passed** |
-| Legal and attribution checks | **Passed** |
-| Package smoke tests | **Passed** |
-| Clean local npm install | Passed |
-| Clean-prefix global npm install | Passed |
-| Git-source installation simulation | Passed |
-| Automatic Pi runtime dependency installation | Passed using an isolated local registry |
-| Installed CLI `--version` | Passed |
-| Installed CLI `self-test` | Passed |
-| Packaged Pi runtime resolution | Passed |
-| No separately installed global `pi` command required | Passed |
-| Real temporary Git worktree verification | Passed |
-| Protocol-faithful expert subprocess | Passed |
-| Source-tree overlay application | Passed |
-| Cross-platform JavaScript entrypoint launch | Passed |
-| Pi license attribution and version consistency | Passed |
+## Local validation
 
-## Covered behavior
+Run with:
 
-The automated suite covers:
+```bash
+npm run ci
+```
 
-- standalone runtime resolution and external-runtime override;
-- exact Node.js minimum-version comparison;
-- cross-platform JavaScript entrypoint launch through Node;
-- single-model and dual-model configuration;
-- independent worker and expert provider, model, thinking, tools, instructions, timeout, output, and cost overrides;
-- exact expert subprocess arguments and fail-closed execution;
-- read-only consultation versus explicit workspace takeover;
-- compact evidence handoffs and malformed-response fallback;
-- OpenRouter and custom OpenAI-compatible provider registration;
-- Contributor consent, repository classification, denied paths, image blocking, and secret redaction;
-- append-only evidence persistence and long-session budget restoration;
-- adaptive routing, threshold-gated consultation, verifier-failure escalation, cooldown, and session budgets;
-- verifier discovery and execution against a real changed Git worktree;
-- completion gating after repository mutation and rejection of false verifier lookalikes;
-- scoped harness proposals, replay, canary activation, promotion, and rollback;
-- optional programmatic workspace persistence, sandbox refusal, and timeout handling;
-- provider capability-probe event processing;
-- clean application into a temporary Pi-style source checkout.
+Validated behavior includes:
 
-## GitHub publication validation
+- Cascade-branded header, footer, and terminal title;
+- no Pi startup header in the real terminal process;
+- no loading or execution of `~/.pi` extensions;
+- no loading of Pi global `AGENTS.md` context;
+- positive loading of `~/.cascade/agent/extensions`;
+- isolated auth, settings, sessions, extensions, skills, prompts, and themes;
+- safe startup with no configuration and no API credentials;
+- safe startup with an old blocked Contributor profile;
+- native worker model selection and full active tool inheritance;
+- explicit configured model selection and reversible tool restrictions;
+- real built-in `write` tool execution through the actual agent loop;
+- post-tool continuation and clean agent settlement;
+- global compaction persistence;
+- self-update command planning;
+- single- and dual-model routing, expert consultation/takeover, evidence, privacy, verification, and session recovery;
+- npm tarball, isolated global-prefix, and Git-source installation.
 
-The repository includes:
+## Credential policy
 
-- Linux, macOS, and Windows CI;
-- Node.js 22.19 and Node.js 24 coverage;
-- exact-commit installation directly from GitHub;
-- CodeQL analysis;
-- Dependabot for npm and GitHub Actions;
-- tag-driven release artifact generation and GitHub Release publishing.
+No user API key is used by automated tests. Live provider validation is intentionally separate and account-specific.
 
-The GitHub-source bootstrap reconstructs an exact locally tested archive and verifies SHA-256 `2ea552b01521022c9972b93ad6b2c889b91dbe4f9c64589e0051eb38a57e4c95` before materialization. Small fixes discovered by cross-platform CI are stored as ordinary, reviewable files in `.bootstrap/overlays/` and applied deterministically after the verified base tree.
+## Cross-platform validation
 
-## Validation boundaries
+GitHub Actions is expected to run:
 
-The build environment could not access the public npm or GitHub networks directly. The npm installation test therefore used a protocol-faithful local package fixture with the exact official Pi package name, version, exports, and executable layout. It validates package dependency installation, executable resolution, argument propagation, and process invocation, but it does not claim to have downloaded the public Pi tarball in that environment.
+- Ubuntu with Node 22.19;
+- Ubuntu with Node 24;
+- current macOS with Node 22.19;
+- current Windows with Node 22.19;
+- exact Git-source installation;
+- CodeQL JavaScript analysis.
 
-Live Meta Model API and OpenRouter calls were not executed because the environment had neither user credentials nor outbound provider access. `cascade doctor`, `cascade probe worker`, and `cascade probe expert` validate real authentication, streaming, tool execution, and exact selected models on the user's machine.
+The final published commit and workflow conclusions should be treated as the release evidence, not an unmerged development branch.

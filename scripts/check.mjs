@@ -32,6 +32,7 @@ const runtimeVersion = defaults.match(/PACKAGE_VERSION\s*=\s*["']([^"']+)["']/)?
 
 for (const required of [
   "bin/cascade.mjs",
+  "extension/cascade.mjs",
   "extension/index.mjs",
   "README.md",
   "INSTALL.md",
@@ -45,7 +46,7 @@ for (const required of [
 ]) {
   if (!existsSync(join(root, required))) failures.push(`Missing required file: ${required}`);
 }
-if (packageJson.pi?.extensions?.[0] !== "./extension/index.mjs") failures.push("package.json Pi extension manifest is invalid");
+if (packageJson.pi !== undefined) failures.push("Standalone Cascade must not expose a Pi package manifest");
 if (packageJson.bin?.["cascade"] !== "./bin/cascade.mjs") failures.push("package.json binary manifest is invalid");
 if (packageJson.dependencies?.["@earendil-works/pi-coding-agent"] !== "0.84.2") {
   failures.push("package.json must pin the standalone Pi runtime dependency to 0.84.2");
@@ -58,6 +59,10 @@ if (upstream.codingAgentVersion !== packageJson.dependencies?.["@earendil-works/
 }
 for (const requiredPackageFile of ["INSTALL.md", "licenses", "THIRD_PARTY_NOTICES.md", "SECURITY.md"]) {
   if (!packageJson.files?.includes(requiredPackageFile)) failures.push(`package.json files omits ${requiredPackageFile}`);
+}
+
+for (const obsolete of ["scripts/apply-to-pi.mjs", "scripts/bootstrap-fork.mjs", "tests/apply-to-pi.test.mjs"]) {
+  if (existsSync(join(root, obsolete))) failures.push(`Obsolete Pi-overlay artifact remains: ${obsolete}`);
 }
 
 // Prevent the removed optional integration from quietly returning in source or docs.

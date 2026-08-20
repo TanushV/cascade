@@ -1,12 +1,10 @@
 # Known limitations
 
-- Cascade is a thin Pi extension and package overlay, not a replacement agent runtime.
-- Live model availability, pricing, rate limits, and API compatibility are account- and date-dependent. Use `cascade probe`.
-- The bundled Meta profile is based on public OpenAI-compatible Model API integration information; an account may require a different current model ID or adapter.
-- Contributor redaction and path denial are defense in depth, not a proof that proprietary information cannot be inferred from ordinary source text.
-- Pi and Pi extensions execute with the launching user's permissions unless the entire process or tool surface is externally sandboxed.
-- Expert cost estimates depend on provider usage/cost reporting or configured catalog rates.
-- Automatic routing begins with a transparent weighted policy. It records trajectory data but does not ship a pretrained proprietary routing model.
-- Harness promotion evaluates observed tasks, not every possible future repository. Global changes therefore require stricter review.
-- The programmatic workspace is a bounded subprocess helper, not a security sandbox or a persistent IPython kernel.
-- The distributed source package includes the full Cascade implementation and deterministic Pi overlay/bootstrap scripts. It does not redistribute Pi's entire upstream monorepo inside the npm tarball.
+- Cascade uses Pi's engine and terminal component library internally. It is a separate application boundary, not an independently reimplemented agent engine.
+- Provider availability, model IDs, prices, limits, and terms change independently of Cascade. Use `/login`, `/model`, and `cascade probe` with your own account.
+- Cascade extensions run with the launching user's operating-system permissions. Use an external sandbox for untrusted repositories or commands.
+- Secret redaction and denied paths are defense in depth; ordinary source text can still disclose proprietary information.
+- The initial router is a transparent trajectory-scoring policy. Repository-local outcome learning requires real usage data and does not guarantee optimal model allocation.
+- Global compaction limits expose the engine's `reserveTokens` and `keepRecentTokens` controls. They do not create a hard provider-side context cap.
+- `cascade update` depends on npm, Git, network access, and write permission to the active global npm prefix.
+- Project `AGENTS.md` files remain visible because they are repository instructions. Pi-specific global state and `.pi/extensions` are isolated.

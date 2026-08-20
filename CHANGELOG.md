@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.0 - 2026-08-19
+
+### Changed
+
+- Cascade now has an isolated application home under `~/.cascade/agent` and no longer imports Pi settings, credentials, sessions, global context, or extensions.
+- Replaced the Pi startup identity with Cascade-owned header, footer, terminal title, resource discovery, and state paths while retaining the Pi engine internally.
+- The default worker uses native Cascade `/model` selection, starts in single mode, inherits all active tools, and does not require configuration to open.
+- Project initialization is optional rather than a startup prerequisite.
+
+### Added
+
+- `/cascade-setup`, `/cascade-worker`, `/cascade-expert`, `/cascade-auth`, and `/cascade-compaction` TUI flows.
+- `cascade update` / `cascade pull` for in-place updates.
+- Global compaction controls via `cascade compaction show|set`.
+- `cascade paths` for inspecting isolated application locations.
+- Real pseudo-terminal isolation tests and a real no-key agent/tool execution test.
+
+### Fixed
+
+- Old or blocked Contributor profiles no longer prevent Cascade from starting.
+- Pi-only extensions and global context can no longer leak into Cascade.
+- Cascade no longer forces a model, provider, thinking level, or tool allowlist before the TUI starts.
+- Removed obsolete source-overlay and fork-bootstrap tooling from the distributed application.
+
+
 ## 0.2.0 - 2026-08-18
 
 ### Changed

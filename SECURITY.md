@@ -10,9 +10,9 @@ Use GitHub's private vulnerability-reporting feature for this repository when av
 
 ## Important trust boundary
 
-Cascade and Pi extensions execute with the permissions of the user who launches them. Model-generated shell commands and code are not automatically sandboxed. Use a container, virtual machine, or another external sandbox for untrusted repositories or generated code.
+Cascade and Cascade-installed extensions execute with the permissions of the user who launches them. Model-generated shell commands and code are not automatically sandboxed. Use a container, virtual machine, or another external sandbox for untrusted repositories or generated code.
 
-Contributor-endpoint filtering and secret redaction are defense-in-depth controls, not a confidentiality guarantee. Keep Contributor endpoints disabled for non-public repositories.
+Cascade isolates Pi application state, but Contributor-endpoint filtering and secret redaction are defense-in-depth controls, not a confidentiality guarantee. Keep Contributor endpoints disabled for non-public repositories.
 
 ## Dependency security
 

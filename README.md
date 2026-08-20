@@ -2,182 +2,195 @@
 
 [![CI](https://github.com/TanushV/cascade/actions/workflows/ci.yml/badge.svg)](https://github.com/TanushV/cascade/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Independent project:** Cascade is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works. “Pi” identifies compatibility with the upstream runtime.
+Cascade is a standalone terminal coding agent with an isolated application home, a native terminal UI, and optional one-worker/one-expert orchestration. It uses the MIT-licensed Pi coding-agent engine as a pinned runtime dependency, but it does not load your Pi configuration, sessions, context, or extensions.
 
-Cascade is a standalone command-line coding agent with a configurable one- or two-model orchestration layer. You install and run `cascade`; a separate global `pi` installation is not required.
+Cascade is an independent project and is not affiliated with or endorsed by Pi, Mario Zechner, or Earendil Works.
 
-It provides one active workspace-owning **worker**, one independently configured on-demand **expert**, evidence-centered handoffs, trajectory-conditioned escalation, deterministic verification, endpoint privacy controls, and a replay-gated harness-learning plane.
+## What is isolated
 
-The implementation targets `@earendil-works/pi-coding-agent@0.84.2` at upstream commit `59a71b235dadb4ad0d67557a8abb0aaa093e68b4`. See [`UPSTREAM.json`](UPSTREAM.json).
+Cascade uses its own application directories:
 
-## Install directly from GitHub
+```text
+~/.cascade/agent/auth.json          provider credentials
+~/.cascade/agent/settings.json      engine and compaction settings
+~/.cascade/agent/sessions/          Cascade sessions
+~/.cascade/agent/extensions/        Cascade-only extensions
+~/.cascade/agent/skills/            Cascade-only skills
+~/.config/cascade/config.json       global orchestration configuration
+<repo>/.cascade/config.json         trusted project configuration
+```
 
-Requirements: Node.js `22.19.0` or newer, npm, and Internet access for the first installation.
+It deliberately does not auto-load `~/.pi`, `.pi/extensions`, Pi sessions, or Pi global context. Project `AGENTS.md` files remain available because they describe the repository rather than another application.
+
+## Install
+
+Requirements: Node.js 22.19.0 or newer, npm, Git, and Internet access for installation.
 
 ```bash
 npm install -g github:TanushV/cascade --ignore-scripts
 ```
 
-npm installs the pinned Pi runtime dependency automatically. A separate `npm install -g @earendil-works/pi-coding-agent` is not needed.
-
-Verify:
+A separate Pi installation is not required. Verify the installed application:
 
 ```bash
 cascade --version
 cascade self-test
-cascade runtime
+cascade paths
 ```
 
-Expected shape:
+## Start
+
+No initialization or model configuration is required merely to open Cascade:
+
+```bash
+cd /path/to/repository
+cascade
+```
+
+Use `cascade --approve` when you intentionally trust project-local `.cascade` resources and configuration.
+
+Inside the TUI:
 
 ```text
-cascade 0.2.0
-bundled-pi 0.84.2
-
-Cascade self-test passed.
+/login openrouter       authenticate using Cascade's isolated credential store
+/model                   select the current worker model
+/cascade-setup           configure single/dual mode, expert, budgets, and privacy
+/cascade-worker          select native or fixed worker behavior
+/cascade-expert          select the expert model
 ```
 
-## Start using it
+Provider environment variables also work, but `/login` avoids shell-history and repository-file mistakes.
+
+## Default behavior
+
+Cascade starts in single-model mode and uses the model selected in its own TUI. The worker inherits the full active tool set, including `read`, `write`, `edit`, `bash`, search tools, and Cascade-only extension tools. Cascade applies a tool allowlist only when `restrictTools` is explicitly enabled.
+
+Dual mode adds one independently configured expert:
+
+```text
+user task
+  -> worker owns the workspace
+  -> evidence, tests, and route signals accumulate
+  -> expert is consulted only when admitted or manually requested
+  -> worker continues, or an explicit bounded takeover edits the workspace
+  -> verification gate checks the final diff
+```
+
+Normal consultations are read-only. Only one model owns workspace edits at a time.
+
+## TUI commands
+
+| Command | Purpose |
+|---|---|
+| `/cascade` | Show current mode, role, models, routing, budgets, and privacy |
+| `/cascade-setup` | Configure Cascade in the TUI and save session/project/global settings |
+| `/cascade-worker` | Choose native TUI model selection or a fixed worker model |
+| `/cascade-expert` | Choose the expert model |
+| `/cascade-auth [provider]` | Prepare the isolated native `/login` flow |
+| `/cascade-mode single\|dual` | Change orchestration mode for the current session |
+| `/cascade-consult <question>` | Run a bounded expert consultation |
+| `/cascade-takeover [objective]` | Explicitly authorize one bounded expert editing episode |
+| `/cascade-evidence [count]` | Inspect recent evidence records |
+| `/cascade-verify` | Discover and execute repository checks |
+| `/cascade-compaction` | View or edit global Cascade compaction settings |
+
+## Global compaction limits
+
+Show the limits used across all Cascade projects:
 
 ```bash
-cd /path/to/your/repository
-cascade init
+cascade compaction show
 ```
 
-The generated configuration starts privacy-safe: repository classification is `unknown`, and Contributor endpoints are disabled until explicitly enabled.
-
-Set credentials for the providers you configure, for example:
+Set them globally:
 
 ```bash
-export OPENROUTER_API_KEY="..."
-export MODEL_API_KEY="..."
+cascade compaction set \
+  --enabled true \
+  --reserve-tokens 16384 \
+  --keep-recent-tokens 20000
 ```
 
-Validate the installation and live endpoints:
+These values are written to `~/.cascade/agent/settings.json`, not Pi's settings.
+
+## Update without uninstalling
+
+After the first installation:
 
 ```bash
-cascade doctor --approve
-cascade probe worker --approve
-cascade probe expert --approve
+cascade update
 ```
 
-Launch interactively:
+`cascade pull` is an alias. Inspect the command without changing anything:
 
 ```bash
-cascade --approve
+cascade update --dry-run
 ```
 
-Or provide a task directly:
+The default update source is the repository's `main` branch. A controlled source can be supplied with `--source` or `CASCADE_UPDATE_SOURCE`.
 
-```bash
-cascade --approve \
-  "Inspect this repository, implement the smallest correct fix, and run the relevant checks."
-```
+## Provider and model configuration
 
-## Model configuration
+The ordinary path is `/login`, `/model`, and `/cascade-setup`. JSON remains available for automation and advanced endpoints.
 
-Both roles are fully configurable. Each can independently select provider and model ID, reasoning level, tool allowlist, role instructions, timeout and output limits, provider base URL, API adapter, headers, credential source, and cost budgets.
-
-Minimal dual-model example in `.cascade/config.json`:
+Example dual-mode project configuration:
 
 ```json
 {
   "schemaVersion": 1,
   "mode": "dual",
   "worker": {
-    "provider": "meta-model-api",
-    "model": "muse-spark-1.2-contributor",
-    "thinking": "medium",
-    "tools": ["read", "grep", "find", "ls", "bash", "edit", "write"]
+    "selectionMode": "native",
+    "thinkingMode": "native",
+    "restrictTools": false
   },
   "expert": {
+    "selectionMode": "configured",
     "provider": "openrouter",
-    "model": "openrouter/auto",
+    "model": "vendor/frontier-model",
+    "thinkingMode": "configured",
     "thinking": "high",
-    "tools": ["read", "grep", "find", "ls", "bash"],
-    "timeoutMs": 600000,
-    "maxOutputCharacters": 120000
+    "restrictTools": false
+  },
+  "routing": {
+    "autoConsult": true
   },
   "privacy": {
-    "classification": "public",
-    "allowContributor": true
+    "classification": "confidential",
+    "allowContributor": false
   }
 }
 ```
 
-Single-model mode uses the same evidence, verification, privacy, checkpoint, and harness path while disabling expert admission:
+Contributor endpoints are denied unless the repository is classified `public` and explicit consent is enabled. A stale optional Contributor profile never prevents Cascade from opening.
+
+## Validation
+
+The test suite includes:
+
+- a real pseudo-terminal launch that proves Cascade branding and rejects Pi-only state and extensions;
+- a real local agent loop that selects the built-in `write` tool, writes a file, consumes the tool result, and completes without API credentials;
+- single- and dual-model routing, evidence, verification, privacy, persistence, and expert-process tests;
+- npm tarball, global-prefix, and direct Git-source installation smoke tests;
+- update-plan and global-compaction persistence tests;
+- Linux, macOS, Windows, Node 22.19, Node 24, and CodeQL checks in GitHub Actions.
+
+Live provider availability is account-specific. After authentication, validate selected configured profiles with:
 
 ```bash
-cascade --single \
-  --worker openrouter/vendor/model-id \
-  "Repair the bug and run the repository checks"
+cascade probe worker --approve
+cascade probe expert --approve
 ```
-
-## Runtime structure
-
-```text
-user task
-   ↓
-configured worker owns the repository workspace
-   ↓
-evidence ledger + tests + route signals
-   ├─ continue worker
-   ├─ consult/review with expert
-   ├─ bounded read-only expert investigation
-   └─ explicitly authorized expert takeover
-   ↓
-verification + checkpoint + completion gate
-```
-
-Only one process owns edits at a time. Expert episodes receive a compact, redacted evidence packet rather than the entire parent transcript.
-
-## Useful commands
-
-| Command | Purpose |
-|---|---|
-| `/cascade` | Show model profiles, budgets, routing state, privacy, and harness manifest |
-| `/cascade-mode single\|dual` | Change mode for the current session |
-| `/cascade-consult <question>` | Run a bounded read-only expert consultation |
-| `/cascade-takeover [objective]` | Run one explicitly authorized expert editing episode |
-| `/cascade-evidence [count]` | Show recent evidence records |
-| `/cascade-verify` | Discover and execute repository checks |
-| `/cascade-refine [focus]` | Generate one small evidence-backed harness proposal |
-| `/cascade-privacy` | Display endpoint policy and denied paths |
-
-## Privacy boundary
-
-A model whose identifier matches the Contributor pattern is denied unless both `privacy.allowContributor` is `true` and `privacy.classification` is `public`.
-
-Secret redaction and denied-path filtering are defense in depth, not a substitute for a real sandbox. Cascade and Pi extensions normally execute with the permissions of the launching user.
 
 ## Development
 
 ```bash
 git clone https://github.com/TanushV/cascade.git
 cd cascade
-npm install --ignore-scripts
+npm ci --ignore-scripts
 npm run ci
 ```
 
-## Validation
+## Legal
 
-The materialized source tree passed locally:
-
-- **45 automated tests, 0 failures**;
-- static syntax/import checks across **42 packaged runtime modules**;
-- legal and attribution consistency checks;
-- standalone npm-tarball installation smoke tests;
-- Git-source installation simulation;
-- one- and two-model runtime, privacy, verification, persistence, replay, and takeover tests.
-
-GitHub Actions adds Linux, macOS, Windows, Node 22.19, Node 24, exact-commit GitHub installation, CodeQL, Dependabot, and tag-driven release automation.
-
-Live provider calls require your own credentials and are validated with `cascade probe worker` and `cascade probe expert`.
-
-## Legal and upstream attribution
-
-Cascade is MIT-licensed. Pi remains a separately installed MIT-licensed dependency; its source tree is not incorporated into Cascade's implementation. The repository preserves Pi's copyright and license notice and records the exact compatible package and commit.
-
-See [`LICENSE`](LICENSE), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt), [`UPSTREAM.json`](UPSTREAM.json), and [`docs/legal.md`](docs/legal.md).
-
-This is an engineering licensing review, not formal legal advice.
+Cascade is MIT-licensed. Pi remains a separate pinned MIT-licensed dependency. Its original license notice is preserved in [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt), and integration details are recorded in [`UPSTREAM.json`](UPSTREAM.json) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

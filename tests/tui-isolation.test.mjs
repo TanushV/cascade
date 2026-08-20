@@ -41,7 +41,10 @@ test("real Cascade TUI is branded and isolated from Pi state and extensions", { 
   assert.equal(report.hasCascadeBrand, true, report.tail);
   assert.equal(report.hasOldPiHeader, false, report.tail);
   assert.equal(report.hasPiContext, false, report.tail);
-  assert.equal(report.hasCascadeStatus, true, report.tail);
+  assert.equal(report.hasNativeModelHint, true, report.tail);
+  assert.equal(report.hasClearSingleStatus, true, report.tail);
+  assert.equal(report.hasClearDualStatus, true, report.tail);
+  assert.equal(report.hasCrypticStatus, false, report.tail);
   assert.equal(existsSync(piMarker), false, "Cascade executed an extension from ~/.pi");
   assert.equal(existsSync(cascadeMarker), true, "Cascade did not load an extension from ~/.cascade");
 });

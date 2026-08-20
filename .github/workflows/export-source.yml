@@ -1,0 +1,37 @@
+name: Export source snapshot
+
+on:
+  push:
+    branches:
+      - agent/pi-parity-tui
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.head_ref == 'agent/pi-parity-tui' || github.ref_name == 'agent/pi-parity-tui'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Install exact dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Create installed workspace archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git -czf "$RUNNER_TEMP/cascade-installed.tgz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cascade-installed
+          path: ${{ runner.temp }}/cascade-installed.tgz
+          if-no-files-found: error
+          retention-days: 1

@@ -1,0 +1,56 @@
+name: Apply Pi parity and TUI migration
+
+on:
+  push:
+    branches:
+      - agent/pi-parity-tui
+    paths:
+      - .apply-pi-parity
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cascade-pi-parity-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/pi-parity-tui
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Apply deterministic source migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/apply-pi-parity-tui-v2.mjs
+          node scripts/apply-pi-parity-tui-v2.mjs
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Validate source and real TUI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run ci
+          npm run tui:smoke
+      - name: Commit generated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .apply-pi-parity
+          rm -f scripts/apply-pi-parity-tui.mjs
+          rm -f scripts/apply-pi-parity-tui-v2.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Restore Pi parity and add native Cascade TUI setup"
+          git push origin HEAD:agent/pi-parity-tui

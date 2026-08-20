@@ -1,0 +1,82 @@
+name: Build clean Pi parity branch
+
+on:
+  push:
+    branches:
+      - agent/pi-parity-tui
+    paths:
+      - .build-clean-parity
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cascade-clean-pi-parity-builder
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/pi-parity-tui
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Materialize and validate final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$VERSION" == "0.2.0" ]]; then
+            node --check scripts/apply-pi-parity-tui-v2.mjs
+            node scripts/apply-pi-parity-tui-v2.mjs
+          fi
+          if [[ -f scripts/finalize-pi-parity.mjs ]]; then
+            node --check scripts/finalize-pi-parity.mjs
+            node scripts/finalize-pi-parity.mjs
+          fi
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run ci
+          npm run tui:smoke
+      - name: Build source-only branch from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/cascade-final-source"
+          mkdir -p "$STAGE"
+          rsync -a \
+            --exclude .git \
+            --exclude .github \
+            --exclude node_modules \
+            --exclude dist \
+            --exclude .apply-pi-parity \
+            --exclude .finalize-pi-parity \
+            --exclude .build-clean-parity \
+            --exclude scripts/apply-pi-parity-tui.mjs \
+            --exclude scripts/apply-pi-parity-tui-v2.mjs \
+            --exclude scripts/finalize-pi-parity.mjs \
+            ./ "$STAGE/"
+
+          git fetch origin main
+          git checkout -B agent/pi-parity-tui-clean origin/main
+          rsync -a --delete \
+            --exclude .git \
+            --exclude .github \
+            --exclude node_modules \
+            "$STAGE/" ./
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run ci
+          npm run tui:smoke
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Restore Pi parity and add native Cascade TUI"
+          git push --force origin HEAD:agent/pi-parity-tui-clean

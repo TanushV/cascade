@@ -3,7 +3,7 @@ name: Materialize Cascade 0.4
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [ready_for_review]
 
 permissions:
   contents: write
@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          cat .publish/patch-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"
+          cat .publish/current-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"
           echo "f3817e3b59825bef1b944c09e706dd73c8c163cc46d0a0a4340bfea3a64128b3  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict
           gunzip -c "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch"
           git apply --binary \

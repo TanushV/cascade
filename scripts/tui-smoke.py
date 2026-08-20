@@ -63,7 +63,11 @@ drain(2.5)
 send(b"\x0f")  # ctrl+o, expand startup/help if available
 drain(0.5)
 send(b"/cascade\r")
-drain(1.2)
+drain(0.8)
+send(b"/cascade-mode dual\r")
+drain(1.0)
+send(b"/cascade\r")
+drain(0.8)
 send(b"\x04")
 drain(0.2)
 send(b"\x04")
@@ -88,9 +92,21 @@ report = {
     "hasCascadeBrand": "Cascade" in plain,
     "hasOldPiHeader": "pi v0.84.2" in plain.lower(),
     "hasPiContext": "PI_ONLY_CONTEXT_SENTINEL" in plain,
-    "hasCascadeStatus": "worker · single · route worker" in plain,
+    "hasNativeModelHint": "/model · /cascade-setup" in plain,
+    "hasClearSingleStatus": "Single · Worker:" in plain,
+    "hasClearDualStatus": "Dual · Active Worker:" in plain and "Expert: on-demand" in plain,
+    "hasCrypticStatus": bool(re.search(r"worker · (?:single|dual) · route ", plain)),
     "tail": plain[-7000:]
 }
-print(json.dumps(report))
-if not report["hasCascadeBrand"] or report["hasOldPiHeader"] or report["hasPiContext"] or not report["hasCascadeStatus"]:
+if (
+    not report["hasCascadeBrand"]
+    or report["hasOldPiHeader"]
+    or report["hasPiContext"]
+    or not report["hasNativeModelHint"]
+    or not report["hasClearSingleStatus"]
+    or not report["hasClearDualStatus"]
+    or report["hasCrypticStatus"]
+):
+    print(json.dumps(report))
     raise SystemExit(1)
+print(json.dumps(report))

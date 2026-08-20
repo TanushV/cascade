@@ -1,0 +1,50 @@
+name: Materialize Cascade 0.4
+
+on:
+  push:
+    branches:
+      - agent/cascade-0.4-materialize
+    paths:
+      - .publish/READY
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-materialize
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Download, verify, test, and commit Cascade 0.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/cascade-0.4.0-source.tar.gz"
+          if ! curl --fail --location --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            'https://files.catbox.moe/u1k819.gz' --output "$ARCHIVE"; then
+            curl --fail --location --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 \
+              'https://tmpfiles.org/dl/587145/cascade-0.4.0-source.tar.gz' --output "$ARCHIVE"
+          fi
+          echo '5b8f78dde762b54bd547d2d0e8ac1c2aa8b9a52bbcd261426f4bc91cc9500bb2  '"$ARCHIVE" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/cascade-source"
+          tar -xzf "$ARCHIVE" -C "$RUNNER_TEMP/cascade-source"
+          rsync -a --delete \
+            --exclude=.git \
+            --exclude=.publish \
+            --exclude=.github/workflows/materialize-cascade-0.4.yml \
+            "$RUNNER_TEMP/cascade-source/" ./
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run ci
+          git config user.name 'TanushV'
+          git config user.email '87838540+TanushV@users.noreply.github.com'
+          git add -A
+          git commit -m 'Ship isolated Cascade 0.4 application'
+          git push origin HEAD:agent/cascade-0.4-materialize

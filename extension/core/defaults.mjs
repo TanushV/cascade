@@ -79,70 +79,114 @@ export const DEFAULT_CONFIG = Object.freeze({
       recommend: 4.0,
       consult: 7.0,
       takeover: 11.0
-    }
-  },
-  privacy: {
-    classification: "unknown",
-    allowContributor: false,
-    allowImagesToContributor: false,
-    redactSecrets: true,
-    contributorPattern: "contributor",
-    deniedPaths: [
-      ".env",
-      ".env.*",
-      "**/.env",
-      "**/.env.*",
-      "**/credentials*",
-      "**/secrets*",
-      "**/*secret*",
-      "**/*token*",
-      "**/*.pem",
-      "**/*.key",
-      "**/.aws/**",
-      "**/.ssh/**",
-      "**/.git/**"
+    },
+    failureCommands: [
+      "test",
+      "pytest",
+      "vitest",
+      "jest",
+      "cargo test",
+      "go test",
+      "npm run check",
+      "npm test",
+      "pnpm test",
+      "bun test",
+      "tsc",
+      "typecheck",
+      "lint",
+      "build"
     ]
   },
   budgets: {
     maxExpertCalls: 4,
-    maxExpertCostUsd: 2.0,
-    maxSessionEstimatedCostUsd: 5.0,
-    maxEvidenceCharacters: 28000,
+    maxExpertCostUsd: 5,
+    maxSessionEstimatedCostUsd: 20,
+    maxEvidenceCharacters: 40000,
     maxLedgerEntriesInHandoff: 80
   },
-  verification: {
-    requireBeforeCompletion: true,
-    autoRunBeforeCompletion: true,
-    maxCompletionGateRuns: 1,
-    timeoutMs: 600000,
-    commands: []
+  privacy: {
+    classification: "unknown",
+    allowContributor: false,
+    contributorPattern: "contributor",
+    requireExplicitRepositoryConsent: true,
+    redactSecrets: true,
+    storeRawToolOutput: false,
+    allowImagesToContributor: false,
+    denyPaths: [
+      ".env",
+      ".env.*",
+      "**/*.pem",
+      "**/*.key",
+      "**/credentials/**",
+      "**/secrets/**",
+      "**/.aws/**",
+      "**/.ssh/**"
+    ],
+    blockDeniedBuiltInTools: true,
+    blockSuspiciousBash: true
   },
   evidence: {
+    enabled: true,
+    persist: true,
     includeGitState: true,
-    maxLedgerEntries: 500
+    includeRecentToolFailures: true,
+    includeHarnessManifest: true
   },
   harnessLearning: {
     mode: "observe",
     scope: "repository",
+    maxPromptEntries: 12,
+    maxMemoryEntries: 40,
+    maxPromptCharacters: 12000,
+    requireReplayForPromotion: true,
+    requireExpertReviewForGlobal: true,
     autoApplySessionMemories: false,
-    replayMinimumCases: 1
+    retirementDays: 60,
+    promotion: {
+      minimumTaskCount: 5,
+      maximumQualityRegression: 0,
+      maximumCostIncrease: 0.05,
+      maximumLatencyIncrease: 0.10,
+      maximumExpertCallRateIncrease: 0.05,
+      maximumComplexityIncrease: 0.10
+    }
+  },
+  verification: {
+    discoverFromRepository: true,
+    commands: [],
+    timeoutMs: 600000,
+    requireBeforeCompletion: true,
+    autoRunBeforeCompletion: true,
+    maxCompletionGateRuns: 2
   },
   workspaceRuntime: {
     enabled: false,
-    pythonPath: "python3",
+    pythonBinary: "python3",
     sandboxCommand: [],
     allowUnsandboxed: false,
-    statePath: ".cascade/workspace/state.json",
-    timeoutMs: 30000,
-    maxStateCharacters: 200000
+    timeoutMs: 120000,
+    maxCodeCharacters: 20000,
+    maxOutputCharacters: 40000,
+    maxStateCharacters: 200000,
+    statePath: ""
   },
   ui: {
-    showStatus: true
+    showHeader: true,
+    showStatus: true,
+    verboseNotifications: false
   }
 });
 
+export const CONTRIBUTOR_CLASSIFICATIONS_ALLOWED_BY_DEFAULT = new Set(["public"]);
 export const VALID_MODES = new Set(["single", "dual"]);
 export const VALID_SELECTION_MODES = new Set(["native", "configured"]);
-export const VALID_THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-export const VALID_CLASSIFICATIONS = new Set(["unknown", "public", "internal", "confidential", "regulated"]);
+export const VALID_THINKING_LEVELS = new Set([
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max"
+]);
 export const VALID_HARNESS_MODES = new Set(["off", "observe", "propose", "canary", "auto-local"]);

@@ -1,6 +1,6 @@
 {
   "name": "cascade",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Cascade coding agent with isolated state, native TUI, and configurable worker/expert orchestration on the Pi engine",
   "type": "module",
   "license": "MIT",

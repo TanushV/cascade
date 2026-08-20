@@ -3,7 +3,7 @@ name: Materialize Cascade 0.4
 on:
   pull_request:
     branches: [main]
-    types: [ready_for_review]
+    types: [synchronize]
 
 permissions:
   contents: write

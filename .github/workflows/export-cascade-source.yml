@@ -6,12 +6,16 @@ on:
       - agent/cascade-0.4-work
     paths:
       - .export-cascade-source
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
   export:
+    if: github.head_ref == 'agent/cascade-0.4-work' || github.ref_name == 'agent/cascade-0.4-work'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -13,3 +13,6 @@ coverage/
 *.zip
 *.tar.gz
 npm-debug.log*
+
+__pycache__/
+*.pyc

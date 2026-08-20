@@ -24,6 +24,9 @@ import {
 } from "./core/verification.mjs";
 import { runProgrammaticWorkspace } from "./core/workspace.mjs";
 import { modelReference, parseModelReference, shortHash, truncateText } from "./core/util.mjs";
+import { applyRoleToolPolicy, createToolPolicyState, modelId, sameModel, usesConfiguredModel } from "./core/pi-parity.mjs";
+import { chooseLoginProvider, prepareNativeLogin, runCascadeSetup, runCompactionSetup, runRoleModelPicker } from "./core/tui-setup.mjs";
+import { getCascadeGlobalCompaction } from "./core/pi-settings.mjs";
 
 const EXTENSION_PATH = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = dirname(dirname(EXTENSION_PATH));
@@ -114,18 +117,16 @@ function activeModelConfig(ctx, config, currentRole) {
   const provider = ctx.model?.provider;
   const id = ctx.model?.id || ctx.model?.model || ctx.model?.modelId;
   if (provider && id) return { provider, model: id };
+  if (currentRole === "worker" && !usesConfiguredModel(config.worker)) return { provider: "native", model: "unselected" };
   return currentRole === "expert" ? config.expert : config.worker;
 }
 
-function formatStatus({ config, ledger, router, currentRole, blockedReason, harness }) {
+function formatStatus({ config, ledger, router, currentRole, blockedReason }) {
   const totals = ledger?.totals() || { expertCalls: 0, estimatedTotalCostUsd: 0 };
   const route = router?.snapshot() || { level: "worker", score: 0 };
-  const data = isContributorModel(currentRole === "expert" ? config.expert : config.worker, config.privacy.contributorPattern)
-    ? "CONTRIBUTOR"
-    : "PRIVATE";
-  const harnessHash = harness?.manifest().combinedHash?.slice(0, 6) || "none";
-  if (blockedReason) return `cascade:BLOCKED ${truncateText(blockedReason, 40)}`;
-  return `cascade:${config.mode}/${currentRole} route:${route.level}:${route.score.toFixed?.(1) ?? route.score} expert:${totals.expertCalls} $${Number(totals.estimatedTotalCostUsd || 0).toFixed(3)} data:${data} h:${harnessHash}`;
+  if (blockedReason) return `Cascade · attention: ${truncateText(blockedReason, 54)}`;
+  const expert = config.mode === "dual" ? ` · expert ${totals.expertCalls}` : "";
+  return `${currentRole} · ${config.mode} · route ${route.level}${expert} · $${Number(totals.estimatedTotalCostUsd || 0).toFixed(3)}`;
 }
 
 function buildSystemAppendix({ config, router, harness, currentRole, contributorPolicy }) {
@@ -199,6 +200,30 @@ export default function cascadeExtension(pi) {
   let lastGateDiffKey = "";
   let completionGateRuns = 0;
   let completionGateInFlight = false;
+  let workerRuntimeModel;
+  let workerRuntimeThinking;
+  let roleSwitchInProgress = false;
+  const toolPolicyState = createToolPolicyState();
+
+  function captureWorkerRuntime(ctx) {
+    if (!ctx?.model) return;
+    workerRuntimeModel = ctx.model;
+    workerRuntimeThinking = ctx.thinkingLevel;
+    config.worker = { ...config.worker, provider: ctx.model.provider, model: modelId(ctx.model) };
+  }
+
+  function cascadeControlTools(role) {
+    const controls = CONTROL_TOOLS.filter((name) => {
+      if (name === "cascade_expert" && config.mode !== "dual") return false;
+      return role === "worker" || name !== "cascade_expert";
+    });
+    if (config.workspaceRuntime?.enabled) controls.push("cascade_workspace");
+    return controls;
+  }
+
+  function applyTools(role, profile) {
+    return applyRoleToolPolicy({ pi, profile, controls: cascadeControlTools(role), state: toolPolicyState });
+  }
 
   function loadConfig(cwd, projectTrusted) {
     const result = loadEffectiveConfig({
@@ -212,18 +237,23 @@ export default function cascadeExtension(pi) {
     if (flagMode === "single" || flagMode === "dual") config.mode = flagMode;
     const workerFlag = pi.getFlag?.("cascade-worker");
     const workerRef = parseModelReference(typeof workerFlag === "string" ? workerFlag : "");
-    if (workerRef?.provider && workerRef?.model) config.worker = { ...config.worker, ...workerRef };
+    if (workerRef?.provider && workerRef?.model) {
+      config.worker = { ...config.worker, ...workerRef, selectionMode: "configured", thinkingMode: "configured" };
+    }
+    if (process.env.CASCADE_WORKER) config.worker.selectionMode = "configured";
     const expertFlag = pi.getFlag?.("cascade-expert");
     const expertRef = parseModelReference(typeof expertFlag === "string" ? expertFlag : "");
-    if (expertRef?.provider && expertRef?.model) config.expert = { ...config.expert, ...expertRef };
+    if (expertRef?.provider && expertRef?.model) {
+      config.expert = { ...config.expert, ...expertRef, selectionMode: "configured", thinkingMode: "configured" };
+    }
     const workerThinking = pi.getFlag?.("cascade-worker-thinking");
     if (typeof workerThinking === "string" && workerThinking) config.worker.thinking = workerThinking;
     const expertThinking = pi.getFlag?.("cascade-expert-thinking");
     if (typeof expertThinking === "string" && expertThinking) config.expert.thinking = expertThinking;
     const workerTools = parseToolList(pi.getFlag?.("cascade-worker-tools"));
-    if (workerTools) config.worker.tools = workerTools;
+    if (workerTools) config.worker = { ...config.worker, tools: workerTools, restrictTools: true };
     const expertTools = parseToolList(pi.getFlag?.("cascade-expert-tools"));
-    if (expertTools) config.expert.tools = expertTools;
+    if (expertTools) config.expert = { ...config.expert, tools: expertTools, restrictTools: true };
     const workerInstructions = pi.getFlag?.("cascade-worker-instructions");
     if (typeof workerInstructions === "string") config.worker.instructions = workerInstructions;
     const expertInstructions = pi.getFlag?.("cascade-expert-instructions");
@@ -285,30 +315,47 @@ ${state.stagedStat || ""}`, 24),
   async function activateRole(role, ctx, { quiet = false } = {}) {
     const target = role === "expert" ? config.expert : config.worker;
     if (role === "expert" && config.mode !== "dual") throw new Error("Expert role is unavailable in single-model mode");
-    const policy = policyFor(target);
+    const policyTarget = role === "worker" && !usesConfiguredModel(target)
+      ? activeModelConfig(ctx, config, currentRole)
+      : target;
+    const policy = policyFor(policyTarget);
     if (!policy.allowed) throw new Error(policy.reason);
-    const model = findConfiguredModel(ctx, target);
-    if (!model) throw new Error(`Configured ${role} model was not found: ${describeModel(target)}`);
-    const changed = await pi.setModel(model);
-    if (!changed) throw new Error(`No usable credentials for ${describeModel(target)}`);
-    pi.setThinkingLevel(target.thinking);
-    const available = new Set(pi.getAllTools().map((tool) => tool.name));
-    const controls = CONTROL_TOOLS.filter((name) => {
-      if (name === "cascade_expert" && config.mode !== "dual") return false;
-      return role === "worker" || name !== "cascade_expert";
-    });
-    const optionalControls = config.workspaceRuntime?.enabled ? ["cascade_workspace"] : [];
-    const desired = [...target.tools, ...controls, ...optionalControls];
-    pi.setActiveTools([...new Set(desired)].filter((name) => available.has(name)));
+
+    roleSwitchInProgress = true;
+    try {
+      if (role === "worker" && !usesConfiguredModel(target)) {
+        if (!workerRuntimeModel && ctx.model) captureWorkerRuntime(ctx);
+        if (workerRuntimeModel && !sameModel(ctx.model, workerRuntimeModel)) {
+          const changed = await pi.setModel(workerRuntimeModel);
+          if (!changed) throw new Error(`No usable credentials for ${workerRuntimeModel.provider}/${modelId(workerRuntimeModel)}`);
+        }
+        if (target.thinkingMode === "configured" && target.thinking) pi.setThinkingLevel(target.thinking);
+        else if (workerRuntimeThinking) pi.setThinkingLevel(workerRuntimeThinking);
+      } else {
+        const model = findConfiguredModel(ctx, target);
+        if (!model) throw new Error(`Configured ${role} model was not found: ${describeModel(target)}`);
+        const changed = await pi.setModel(model);
+        if (!changed) throw new Error(`No Cascade credential for ${describeModel(target)}. Run /login ${target.provider}.`);
+        if (target.thinkingMode !== "native" && target.thinking) pi.setThinkingLevel(target.thinking);
+      }
+    } finally {
+      roleSwitchInProgress = false;
+    }
+
+    applyTools(role, target);
     currentRole = role;
     blockedReason = "";
-    if (!quiet) notify(ctx, `Cascade active role: ${role} (${describeModel(target)})`, "info");
+    if (!quiet) {
+      const label = role === "worker" && !usesConfiguredModel(target) ? "current model" : describeModel(target);
+      notify(ctx, `Active ${role}: ${label}`, "info");
+    }
     updateStatus(ctx);
   }
 
   function initialize(ctx) {
     activeCtx = ctx;
     const result = loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
+    if (!usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
     registerConfiguredProviders(pi, config, { onWarning: (message) => notify(ctx, message, "warning") });
     const piSessionId = ctx.sessionManager?.getSessionId?.();
     ledger = new EvidenceLedger({ cwd: ctx.cwd, config, harnessManifest: { pending: true }, sessionId: piSessionId });
@@ -323,15 +370,17 @@ ${state.stagedStat || ""}`, 24),
     completionGateRuns = 0;
     completionGateInFlight = false;
     blockedReason = "";
-    const initialProfile = currentRole === "expert" ? config.expert : config.worker;
+    const initialProfile = currentRole === "expert"
+      ? config.expert
+      : (usesConfiguredModel(config.worker) ? config.worker : activeModelConfig(ctx, config, currentRole));
     const initialPolicy = policyFor(initialProfile);
     if (!initialPolicy.allowed) blockedReason = initialPolicy.reason;
     initialized = true;
     for (const warning of result.validation.warnings) notify(ctx, warning, "warning");
     if (result.validation.errors.length) {
-      blockedReason = result.validation.errors.join("; ");
-      notify(ctx, `Cascade configuration errors: ${blockedReason}`, "error");
+      notify(ctx, `Configuration warning: ${result.validation.errors.join("; ")}. Use /cascade-setup to repair it.`, "warning");
     }
+    if (process.env.CASCADE_STARTUP_WARNING) notify(ctx, process.env.CASCADE_STARTUP_WARNING, "warning");
     updateStatus(ctx);
   }
 
@@ -578,13 +627,12 @@ ${state.stagedStat || ""}`, 24),
   pi.on("session_start", async (_event, ctx) => {
     initialize(ctx);
     if (process.env.CASCADE_CHILD === "1") return;
-    if (!blockedReason) {
-      try {
-        await activateRole("worker", ctx, { quiet: true });
-      } catch (error) {
-        blockedReason = error instanceof Error ? error.message : String(error);
-        notify(ctx, `Cascade could not activate worker: ${blockedReason}`, "error");
-      }
+    try {
+      await activateRole("worker", ctx, { quiet: true });
+    } catch (error) {
+      blockedReason = "";
+      notify(ctx, `${error instanceof Error ? error.message : String(error)} The TUI remains available; use /login, /model, or /cascade-setup.`, "warning");
+      applyTools("worker", config.worker);
     }
     updateStatus(ctx);
   });
@@ -838,9 +886,122 @@ ${summarizeVerificationReport(report)}` }],
     });
   });
 
-  pi.on("model_select", (_event, ctx) => {
+  pi.on("model_select", (event, ctx) => {
     activeCtx = ctx;
+    if (!roleSwitchInProgress) {
+      if (currentRole === "worker") {
+        workerRuntimeModel = event.model;
+        workerRuntimeThinking = ctx.thinkingLevel;
+        config.worker = { ...config.worker, provider: event.model.provider, model: modelId(event.model) };
+      } else if (currentRole === "expert") {
+        config.expert = { ...config.expert, selectionMode: "configured", provider: event.model.provider, model: modelId(event.model) };
+      }
+    }
     updateStatus(ctx);
+  });
+
+  pi.on("thinking_level_select", (event, ctx) => {
+    activeCtx = ctx;
+    if (!roleSwitchInProgress) {
+      if (currentRole === "worker") {
+        workerRuntimeThinking = event.level;
+        if (config.worker.thinkingMode === "configured") config.worker.thinking = event.level;
+      } else if (currentRole === "expert") {
+        config.expert = { ...config.expert, thinkingMode: "configured", thinking: event.level };
+      }
+    }
+    updateStatus(ctx);
+  });
+
+  async function applySetupResult(result, ctx) {
+    if (!result || result.cancelled) return false;
+    if (result.scope === "session") config = result.config;
+    else loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
+    validation = validateConfig(config);
+    registerConfiguredProviders(pi, config, { onWarning: (message) => notify(ctx, message, "warning") });
+    if (validation.errors.length) {
+      notify(ctx, `Configuration errors: ${validation.errors.join("; ")}`, "error");
+      return false;
+    }
+    if (!usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
+    const role = currentRole === "expert" && config.mode === "dual" ? "expert" : "worker";
+    try { await activateRole(role, ctx, { quiet: true }); }
+    catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "warning"); }
+    notify(ctx, result.path ? `Settings saved to ${result.path}` : "Settings applied to this session", "info");
+    if (result.loginProvider) prepareNativeLogin(ctx, result.loginProvider);
+    updateStatus(ctx);
+    return true;
+  }
+
+  async function openSetup(ctx) {
+    ensureInitialized(ctx);
+    return applySetupResult(await runCascadeSetup({ ctx, config }), ctx);
+  }
+
+  async function openRoleModelPicker(role, ctx) {
+    ensureInitialized(ctx);
+    const result = await runRoleModelPicker({ ctx, config, role });
+    if (!result || result.cancelled) return false;
+    config = result.config;
+    if (result.scope !== "session") loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
+    if (role === "worker" && !usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
+    try { if (currentRole === role || role === "worker") await activateRole(role, ctx, { quiet: true }); }
+    catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "warning"); }
+    notify(ctx, result.path ? `${role} model saved to ${result.path}` : `${role} model changed for this session`, "info");
+    if (result.loginProvider) prepareNativeLogin(ctx, result.loginProvider);
+    updateStatus(ctx);
+    return true;
+  }
+
+  pi.registerCommand("cascade-setup", {
+    description: "Configure Cascade in the TUI",
+    async handler(_args, ctx) {
+      try { await openSetup(ctx); }
+      catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "error"); }
+    }
+  });
+
+  pi.registerCommand("cascade-worker", {
+    description: "Choose the worker model",
+    async handler(_args, ctx) {
+      try { await openRoleModelPicker("worker", ctx); }
+      catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "error"); }
+    }
+  });
+
+  pi.registerCommand("cascade-expert", {
+    description: "Choose the expert model",
+    async handler(_args, ctx) {
+      try { await openRoleModelPicker("expert", ctx); }
+      catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "error"); }
+    }
+  });
+
+  pi.registerCommand("cascade-auth", {
+    description: "Prepare the native /login flow for a provider",
+    async handler(args, ctx) {
+      ensureInitialized(ctx);
+      const requested = String(args || "").trim();
+      const provider = requested || await chooseLoginProvider(ctx);
+      if (provider) prepareNativeLogin(ctx, provider);
+    }
+  });
+
+  pi.registerCommand("cascade-compaction", {
+    description: "Configure global Cascade compaction limits",
+    async handler(args, ctx) {
+      ensureInitialized(ctx);
+      if (String(args || "").trim() === "show") {
+        notify(ctx, JSON.stringify(getCascadeGlobalCompaction(), null, 2), "info");
+        return;
+      }
+      try {
+        const result = await runCompactionSetup(ctx);
+        if (!result.cancelled) notify(ctx, `Global compaction settings saved to ${result.path}. Restart Cascade to apply them.`, "info");
+      } catch (error) {
+        notify(ctx, error instanceof Error ? error.message : String(error), "error");
+      }
+    }
   });
 
   pi.registerCommand("cascade", {
@@ -848,6 +1009,7 @@ ${summarizeVerificationReport(report)}` }],
     async handler(args, ctx) {
       ensureInitialized(ctx);
       const [action] = parseWords(args);
+      if (action === "setup") return await openSetup(ctx);
       if (action === "reload") {
         initialize(ctx);
         await activateRole(currentRole === "expert" && config.mode === "dual" ? "expert" : "worker", ctx, { quiet: true });
@@ -863,14 +1025,38 @@ ${summarizeVerificationReport(report)}` }],
         totals: ledger.totals(),
         privacy: {
           classification: config.privacy.classification,
-          worker: policyFor(config.worker),
+          worker: policyFor(usesConfiguredModel(config.worker) ? config.worker : activeModelConfig(ctx, config, "worker")),
           expert: config.mode === "dual" ? policyFor(config.expert) : undefined
         },
         harness: harness.manifest(),
         configSources,
         blockedReason: blockedReason || null
       };
-      notify(ctx, JSON.stringify(report, null, 2), blockedReason ? "error" : "info");
+      if (action === "details" || action === "json") {
+        notify(ctx, JSON.stringify(report, null, 2), blockedReason ? "error" : "info");
+      } else {
+        const runtimeProvider = ctx.model?.provider;
+        const runtimeModel = modelId(ctx.model);
+        const runtimeLabel = !runtimeProvider || runtimeProvider === "unknown" || !runtimeModel || runtimeModel === "unknown"
+          ? "not selected"
+          : `${runtimeProvider}/${runtimeModel}`;
+        const worker = usesConfiguredModel(config.worker)
+          ? describeModel(config.worker)
+          : `current Cascade model (${runtimeLabel})`;
+        const expert = config.mode === "dual" ? describeModel(config.expert) : "disabled";
+        const totals = report.totals;
+        const route = report.route;
+        notify(ctx, [
+          `Cascade ${PACKAGE_VERSION}`,
+          `Mode: ${config.mode} · active role: ${currentRole}`,
+          `Worker: ${worker}`,
+          `Expert: ${expert}`,
+          `Route: ${route.level} (${Number(route.score || 0).toFixed(1)})`,
+          `Usage: ${totals.expertCalls || 0} expert calls · $${Number(totals.estimatedTotalCostUsd || 0).toFixed(3)}`,
+          `Privacy: ${config.privacy.classification} · Contributor ${config.privacy.allowContributor ? "allowed" : "blocked"}`,
+          blockedReason ? `Attention: ${blockedReason}` : "Ready. Use /cascade-setup to change settings; /cascade details for JSON."
+        ].join("\n"), blockedReason ? "error" : "info");
+      }
       updateStatus(ctx);
     }
   });

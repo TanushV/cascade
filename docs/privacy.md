@@ -1,16 +1,32 @@
 # Privacy and trust
 
+## Application isolation
+
+Cascade sets the engine directory to `~/.cascade/agent` and disables automatic Pi resource discovery. It does not read or execute:
+
+- `~/.pi/agent/AGENTS.md`;
+- `~/.pi/agent/auth.json`;
+- `~/.pi/agent/extensions`;
+- project `.pi/extensions`;
+- Pi sessions or Pi settings.
+
+Cascade discovers global extensions, skills, prompts, and themes only under `~/.cascade/agent`. Trusted project resources live under `.cascade`.
+
+Repository `AGENTS.md` files remain available because they are project instructions, not Pi application state.
+
+## Credentials
+
+Native `/login` inside Cascade writes credentials to `~/.cascade/agent/auth.json`. Environment variables remain process-level inputs and are therefore shared if the user exports them in the shell. Secrets should not be written into project configuration.
+
 ## Contributor endpoints
 
-Cascade treats a model identifier matching `privacy.contributorPattern` as a distinct data-use class. The endpoint is blocked unless the repository is classified `public` and `privacy.allowContributor` is explicitly true.
+A model identifier matching `privacy.contributorPattern` is treated as a distinct data-use class. It is blocked unless the repository is classified `public` and `privacy.allowContributor` is explicitly true.
 
-No fallback may cross from a private endpoint to Contributor unless that endpoint is independently configured and admitted by the same policy.
+A stale Contributor profile never blocks application startup. Policy is evaluated when Cascade actually selects or invokes that profile.
 
 ## Denied paths and tool calls
 
-While a Contributor model is active, Cascade inspects built-in `read`, `edit`, `write`, `grep`, `find`, `ls`, and suspicious `bash` calls against `privacy.denyPaths`. Common credential locations are denied by default. Images are blocked unless explicitly enabled.
-
-The policy applies both to the parent worker and to isolated expert episodes.
+While a Contributor model is active, Cascade inspects built-in file/search tools and suspicious shell calls against `privacy.denyPaths`. Common credential locations are denied by default. Images are blocked unless explicitly enabled.
 
 ## Evidence redaction
 
@@ -18,12 +34,10 @@ Evidence handoffs redact common key, token, authorization, password, and secret 
 
 Redaction is defense in depth. Arbitrary source text may still contain identifying or proprietary information that does not resemble a credential.
 
-## Trust boundary
+## Operating-system boundary
 
-Pi extensions and generated commands execute with the user's operating-system permissions. Cascade's privacy policy controls admission and selected built-in tools; it does not create kernel-level filesystem, process, network, or credential isolation.
-
-Use an external container, micro-VM, or policy sandbox for untrusted repositories or generated code. The optional programmatic workspace has its own explicit sandbox requirement, but the rest of Pi must also be isolated when stronger boundaries are needed.
+Cascade and its extensions execute with the launching user's permissions. Use a container, micro-VM, or policy sandbox for untrusted repositories or generated commands.
 
 ## Project trust
 
-Project `.cascade/config.json`, project extensions, and project skills should be loaded only after Pi trusts the project. The wrapper recognizes `--approve` and passes it through to Pi. Non-interactive automation should set project trust deliberately rather than relying on an interactive prompt.
+Project `.cascade/config.json`, extensions, skills, prompts, and themes are loaded only when the project is trusted. `cascade --approve` intentionally enables those project-local resources.

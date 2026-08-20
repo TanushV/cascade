@@ -6,12 +6,13 @@ import { deepClone } from "../extension/core/util.mjs";
 
 test("contributor models require public explicit consent", () => {
   const config = deepClone(DEFAULT_CONFIG);
-  assert.equal(evaluateContributorPolicy(config, config.worker).allowed, false);
+  const contributor = { provider: "meta-model-api", model: "muse-spark-1.2-contributor" };
+  assert.equal(evaluateContributorPolicy(config, contributor).allowed, false);
   config.privacy.allowContributor = true;
   config.privacy.classification = "public";
-  assert.equal(evaluateContributorPolicy(config, config.worker).allowed, true);
+  assert.equal(evaluateContributorPolicy(config, contributor).allowed, true);
   config.privacy.classification = "confidential";
-  assert.equal(evaluateContributorPolicy(config, config.worker).allowed, false);
+  assert.equal(evaluateContributorPolicy(config, contributor).allowed, false);
 });
 
 test("private models are not blocked by contributor policy", () => {

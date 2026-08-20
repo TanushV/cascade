@@ -1,58 +1,52 @@
 # Testing
 
-## Automated local suite
-
-Run:
+## Full local suite
 
 ```bash
-npm test
-npm run check
-npm run smoke
+npm ci --ignore-scripts
+npm run ci
 ```
 
 The suite covers:
 
-- configuration precedence and project trust;
-- full worker/expert profile overrides;
-- one-model collapse;
-- provider registration and exact model selection;
-- isolated expert JSON-stream parsing;
-- read-only consultation and editable takeover tool policies;
-- append-only evidence persistence and session recovery;
-- route escalation, decay, cooldown, and budget admission;
-- Contributor consent, secret redaction, image denial, and protected paths;
-- real temporary Git repositories and completion verification;
-- harness proposals, canaries, replay metrics, promotion, rollback, and non-persistence of canaries;
-- optional workspace sandbox refusal and bounded state persistence;
-- package overlay installation;
-- npm package creation, local installation, and isolated global installation with no pre-existing `pi` executable.
+- configuration precedence, migration, and project trust;
+- isolated `~/.cascade` state, auth, sessions, settings, and resource discovery;
+- proof that fake `~/.pi` context and extensions are neither displayed nor executed;
+- a real pseudo-terminal Cascade launch with custom header/footer and native commands;
+- a real no-key agent loop using the engine's built-in `write` tool and a second post-tool model turn;
+- native worker model selection and unrestricted tool inheritance;
+- configured worker/expert overrides and reversible explicit tool restrictions;
+- expert consultation, read-only investigation, and explicit takeover;
+- evidence, routing, budgets, privacy, verification, persistence, and harness replay;
+- global compaction settings and self-update planning;
+- npm tarball, global-prefix, and Git-source installations without a separate Pi install.
 
-A protocol-faithful local npm registry supplies a package with the exact official Pi package name, version, exports, and CLI layout during offline release smoke tests. The final Cascade tarball is installed by itself, proving npm resolves the runtime as its dependency rather than relying on a pre-existing global `pi` command. Protocol-faithful fake Pi executables are also used for focused child-process tests. Repository verification tests use actual Git and actual subprocess commands.
+## Real terminal isolation test
 
-## What local tests do not prove
+The pseudo-terminal test creates two fake application homes:
 
-The build environment has no provider credentials and no direct network access. Therefore the local suite does not claim that a particular OpenRouter route or Meta catalog entry is currently enabled for your account.
+```text
+~/.pi/agent/extensions/pi-only-sentinel.mjs
+~/.cascade/agent/extensions/cascade-only-sentinel.mjs
+```
 
-Run the live probes after configuring credentials:
+It launches the actual `cascade` terminal process and proves that only the Cascade extension executes. It also verifies the Cascade brand, absence of Pi's startup header, absence of Pi global context, and a responsive `/cascade` command.
+
+## Real no-key agent/tool test
+
+A keyless local provider drives the actual `createAgentSession` engine. The first model turn requests the real built-in `write` tool. The engine writes a file, returns the tool result, performs a second model turn, and settles. This test does not use network access or user credentials.
+
+## Live providers
+
+The automated suite deliberately does not use user API keys. Provider-account validation remains explicit:
 
 ```bash
-cascade doctor --approve
 cascade probe worker --approve
 cascade probe expert --approve
 ```
 
-A probe verifies authentication, exact model selection, streaming completion, tool execution, usage reporting, and Pi's provider adapter path. It consumes a small amount of provider quota.
+A probe may consume a small amount of provider quota.
 
-## Evaluation manifests
+## Cross-platform CI
 
-`cascade eval` executes each task in Pi JSON mode and then runs deterministic checks.
-
-```bash
-cascade eval examples/eval-manifest.json --output eval-report.json
-```
-
-Harness replay executes the same manifest under baseline and canary harness states. Isolation is enabled by default. `--no-isolation` is available for controlled disposable workspaces and may contaminate state between runs.
-
-## Release evidence
-
-`TEST_REPORT.md` records the exact commands, runtime, counts, and limitations for the distributed archive.
+GitHub Actions runs the suite on Linux, macOS, Windows, Node 22.19, and Node 24. It also installs the exact Git commit into a clean prefix and runs `cascade --version`, `cascade self-test`, `cascade paths`, and update/compaction smoke checks. CodeQL runs separately.

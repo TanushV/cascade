@@ -1,86 +1,55 @@
 # Architecture
 
-## Three planes
+## Application boundary
+
+Cascade is a standalone application that uses the Pi coding-agent package as an internal engine dependency. The `cascade` launcher establishes a separate application boundary before starting the engine:
 
 ```text
-Immutable control plane
-  privacy · credentials · hard budgets · protected paths · audit · rollback
-
-Task execution plane
-  worker · expert subprocess · evidence ledger · adaptive router · verification
-
-Harness learning plane
-  scoped candidates · replay metrics · canary · promotion · rollback · retirement
+Cascade CLI
+  -> ~/.cascade/agent state and credentials
+  -> Cascade-only resource discovery
+  -> Cascade application TUI/header/footer
+  -> Pi agent loop and built-in coding tools
+  -> Cascade orchestration extension
 ```
 
-## Standalone runtime delivery
+The launcher disables automatic Pi extension, skill, prompt, and theme discovery, then explicitly loads Cascade's application extension plus resources from `~/.cascade/agent` and trusted project `.cascade` directories. It never discovers `~/.pi` or project `.pi/extensions`.
 
-Cascade declares `@earendil-works/pi-coding-agent@0.84.2` as a normal runtime dependency and resolves its exported package location from inside the installed Cascade package. Parent sessions, expert subprocesses, probes, and diagnostics all launch that packaged runtime directly. A global `pi` command is neither discovered nor required unless the operator explicitly supplies `--pi-bin` as a development override.
+## Engine relationship
 
-## Thin Pi integration
+`@earendil-works/pi-coding-agent@0.84.2` supplies the model runtime, agent loop, terminal primitives, sessions, compaction, provider adapters, and built-in coding tools. Cascade does not fork or vendor Pi source. The dependency and compatible upstream commit are pinned and attributed.
 
-Cascade uses Pi's supported extension surface for provider registration, model switching, lifecycle events, custom tools, commands, persistent session entries, project trust, and package loading. Pi's base agent loop and terminal UI remain upstream-owned.
-
-The wrapper performs the one operation an ordinary extension cannot perform before the first provider request: it selects the configured worker and injects the extension on process startup.
-
-## Workspace ownership
-
-The parent Pi session normally owns edits. Expert episodes are synchronous from the parent's perspective:
+## Execution planes
 
 ```text
-parent pauses
-  → checkpoint/evidence packet
-  → isolated child Pi process
-  → child exits
-  → parent records outcome and resumes
+Control plane
+  isolated state · credentials · privacy · budgets · protected paths · update policy
+
+Task plane
+  worker · optional expert · evidence ledger · router · verification
+
+Harness-learning plane
+  scoped proposals · replay · canary · promotion · rollback
 ```
 
-Consultation, review, and investigation are forced read-only. An explicitly authorized takeover may edit with the expert's configured tools. This maintains one active workspace owner.
+## Worker and expert
 
-## Expert process
+The parent session is the only default workspace owner. A native worker follows Cascade's `/model` selection and inherits all active tools. A configured worker may pin a model. Explicit `restrictTools: true` is required before Cascade narrows the worker tool set.
 
-The child runs Pi's JSON event-stream mode with:
+Expert consultation, review, and investigation run in a bounded child process with a compact evidence packet and read-only tools. An explicit takeover may edit with the expert profile's configured tools. Exact model selection fails closed; there is no silent capability or privacy downgrade.
 
-- exact provider and model;
-- exact thinking level;
-- bounded tool allowlist;
-- compact evidence JSON;
-- trust status;
-- custom provider shim;
-- timeout and output bounds.
+## Evidence and routing
 
-Unavailable exact models fail closed. The runtime does not silently replace the expert with another provider/model.
-
-## Evidence
-
-The append-only ledger stores bounded, redacted records of:
-
-- goals;
-- tool calls and results;
-- route signals;
-- Git state;
-- checkpoints;
-- verifier results;
-- model usage and estimated cost;
-- expert episodes;
-- harness changes.
-
-The handoff compiler progressively compacts data while preserving valid JSON and the most decision-relevant facts.
-
-## Routing
-
-The router accumulates decaying trajectory signals rather than classifying the initial prompt. Signals include repeated errors, verifier failures, explicit uncertainty, stale progress, large diffs, broad file spread, and protected-path attempts.
-
-Weights and thresholds are configuration. Model names and programming languages do not appear in routing branches. Expert admission also checks cooldown, call count, expert cost, and total session cost.
+The append-only ledger stores bounded and redacted goals, repository facts, tool outcomes, route signals, checkpoints, verifier results, usage, and expert episodes. Routing uses the observed trajectory rather than guessing task difficulty from the initial prompt.
 
 ## Completion
 
-When a repository diff changes, the previous completion proof becomes stale. Before settlement, the runtime may discover and run repository verification commands. Completion is blocked when required checks fail or remain unverified after the configured gate limit.
+Repository changes invalidate earlier verification. The completion gate discovers or uses configured checks, records the current diff identity, and requires successful evidence before completion when policy enables it.
 
-## Harness learning
+## Compaction
 
-Every trajectory records its harness manifest. Proposed prompt, memory, skill-description, or subagent-description edits remain inactive until evaluated. Process-local canaries cannot persist as promoted state by accident. Promotion writes versioned snapshots and supports rollback.
+Cascade uses the engine's structured compaction implementation but stores global limits in `~/.cascade/agent/settings.json`. The extension adds evidence and route state to compaction instructions so continuation state survives long sessions.
 
-## Single mode
+## Updating
 
-Single mode uses the same task plane and simply denies expert admission. There is no alternate legacy runtime.
+`cascade update` runs npm against the configured Git source without uninstalling the current package first. Application data is outside the npm installation and survives updates.

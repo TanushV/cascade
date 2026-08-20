@@ -80,8 +80,8 @@ test("dual extension runs a fully configured isolated expert consultation", asyn
     schemaVersion: 1,
     mode: "dual",
     piBinary: fake,
-    worker: { provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
-    expert: { provider: "openrouter", model: "expert", thinking: "high", tools: ["read", "grep", "bash"], timeoutMs: 5000 },
+    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
+    expert: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "expert", thinking: "high", tools: ["read", "grep", "bash"], timeoutMs: 5000 },
     privacy: { classification: "internal", allowContributor: false },
     routing: { autoConsult: false }
   }));
@@ -116,7 +116,7 @@ test("contributor input is redacted, images are denied, and protected paths are 
   writeFileSync(configPath, JSON.stringify({
     schemaVersion: 1,
     mode: "single",
-    worker: { provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read", "bash"] },
+    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read", "bash"] },
     privacy: { classification: "public", allowContributor: true, allowImagesToContributor: false, redactSecrets: true }
   }));
   const cleanup = withCascadeEnvironment(configPath, statePath);
@@ -157,7 +157,7 @@ test("session cost budget blocks later prompts after recorded worker usage", asy
   writeFileSync(configPath, JSON.stringify({
     schemaVersion: 1,
     mode: "single",
-    worker: { provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read"] },
+    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read"] },
     privacy: { classification: "public", allowContributor: true },
     budgets: { maxSessionEstimatedCostUsd: 0.001 }
   }));
@@ -193,7 +193,7 @@ test("completion gate verifies a real changed Git worktree before accepting sett
   writeFileSync(configPath, JSON.stringify({
     schemaVersion: 1,
     mode: "single",
-    worker: { provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
+    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
     privacy: { classification: "internal", allowContributor: false },
     verification: { requireBeforeCompletion: true, autoRunBeforeCompletion: true, maxCompletionGateRuns: 1, timeoutMs: 10000 }
   }));
@@ -229,7 +229,7 @@ test("a successful non-verifier command cannot bypass the completion gate", asyn
   writeFileSync(configPath, JSON.stringify({
     schemaVersion: 1,
     mode: "single",
-    worker: { provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
+    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
     privacy: { classification: "internal", allowContributor: false },
     verification: { requireBeforeCompletion: true, autoRunBeforeCompletion: true, maxCompletionGateRuns: 1, timeoutMs: 10000 }
   }));

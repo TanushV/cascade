@@ -66,7 +66,22 @@ try {
     files: ["dist"]
   }, null, 2)}\n`);
   writeFileSync(join(fakePiDir, "dist", "index.js"), "export const smokeRuntime = true;\n");
-  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst args = process.argv.slice(2);\nif (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }\nif (process.env.CASCADE_SMOKE_ARGS) writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify(args));\nconsole.log("pi smoke runtime");\n`);
+  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }
+if (process.env.CASCADE_SMOKE_ARGS) {
+  writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify({
+    args,
+    env: {
+      agentDir: process.env.PI_CODING_AGENT_DIR,
+      sessionDir: process.env.PI_CODING_AGENT_SESSION_DIR,
+      agentName: process.env.AI_AGENT
+    }
+  }));
+}
+console.log("cascade engine smoke runtime");
+`);
   chmodSync(join(fakePiDir, "dist", "cli.js"), 0o755);
 
   cpSync(packageRoot, gitSource, {
@@ -187,6 +202,8 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
   const installedRoot = join(installDir, "node_modules", "cascade");
   const installedPackage = JSON.parse(readFileSync(join(installedRoot, "package.json"), "utf8"));
   if (installedPackage.name !== "cascade") throw new Error("Installed package identity is incorrect");
+  if (installedPackage.pi !== undefined) throw new Error("Standalone Cascade unexpectedly exposes a Pi package manifest");
+  if (!existsSync(join(installedRoot, "extension", "cascade.mjs"))) throw new Error("Cascade application extension is missing");
   if (installedPackage.dependencies?.["@earendil-works/pi-coding-agent"] !== "0.84.2") {
     throw new Error("Standalone Pi runtime dependency is missing or unpinned");
   }
@@ -231,25 +248,72 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
     throw new Error(`Git-source standalone self-test failed: ${gitSelfTest}`);
   }
 
+  const isolatedHome = join(temporary, "isolated-home");
+  const staleProject = join(temporary, "stale-project");
+  mkdirSync(join(staleProject, ".cascade"), { recursive: true });
+  writeFileSync(join(staleProject, ".cascade", "config.json"), `${JSON.stringify({
+    schemaVersion: 1,
+    mode: "dual",
+    worker: {
+      provider: "meta-model-api",
+      model: "muse-spark-1.2-contributor",
+      thinking: "medium",
+      tools: ["read", "write"]
+    },
+    expert: {
+      provider: "openrouter",
+      model: "openrouter/auto",
+      thinking: "high",
+      tools: ["read"]
+    },
+    privacy: { classification: "unknown", allowContributor: false }
+  }, null, 2)}\n`);
+
   const argsPath = join(temporary, "spawn-args.json");
-  run(process.execPath, [
-    cli,
-    "--single",
-    "--worker", "openrouter/vendor/smoke-worker",
-    "--",
-    "--mode", "json",
-    "hello"
-  ], {
-    cwd: installDir,
+  run(process.execPath, [cli, "--approve", "--mode", "json", "hello"], {
+    cwd: staleProject,
     capture: true,
-    env: { ...process.env, CASCADE_SMOKE_ARGS: argsPath, CASCADE_STATE_DIR: join(temporary, "state") }
+    env: {
+      ...process.env,
+      HOME: isolatedHome,
+      CASCADE_SMOKE_ARGS: argsPath,
+      CASCADE_STATE_DIR: join(temporary, "state")
+    }
   });
-  const spawnedArgs = JSON.parse(readFileSync(argsPath, "utf8"));
-  if (!spawnedArgs.includes("--extension") || !spawnedArgs.includes("vendor/smoke-worker")) {
-    throw new Error(`Standalone wrapper did not launch bundled Pi correctly: ${JSON.stringify(spawnedArgs)}`);
+  const launch = JSON.parse(readFileSync(argsPath, "utf8"));
+  const spawnedArgs = launch.args;
+  const extensionIndex = spawnedArgs.indexOf("--extension");
+  if (
+    !spawnedArgs.includes("--no-extensions") ||
+    !spawnedArgs.includes("--no-skills") ||
+    extensionIndex < 0 ||
+    !String(spawnedArgs[extensionIndex + 1] || "").endsWith(join("extension", "cascade.mjs")) ||
+    spawnedArgs.includes("--provider") ||
+    spawnedArgs.includes("--model")
+  ) {
+    throw new Error(`Standalone wrapper did not launch the isolated Cascade application correctly: ${JSON.stringify(launch)}`);
+  }
+  const expectedAgentDir = join(isolatedHome, ".cascade", "agent");
+  if (launch.env.agentDir !== expectedAgentDir || launch.env.sessionDir !== join(expectedAgentDir, "sessions")) {
+    throw new Error(`Cascade engine directories are not isolated: ${JSON.stringify(launch.env)}`);
+  }
+  if (launch.env.agentName !== "cascade") throw new Error(`Cascade engine identity is incorrect: ${JSON.stringify(launch.env)}`);
+
+  const compaction = run(process.execPath, [
+    cli,
+    "compaction", "set",
+    "--reserve-tokens", "12000",
+    "--keep-recent-tokens", "18000"
+  ], { cwd: installDir, capture: true, env: { ...process.env, HOME: isolatedHome } });
+  const compactionResult = JSON.parse(compaction);
+  if (compactionResult.compaction.reserveTokens !== 12000 || compactionResult.compaction.keepRecentTokens !== 18000) {
+    throw new Error(`Global compaction settings did not persist: ${compaction}`);
   }
 
-  console.log(`Standalone package and Git-source smoke tests passed: ${cascadeTarball}`);
+  const updatePlan = run(process.execPath, [cli, "update", "--dry-run"], { cwd: installDir, capture: true });
+  if (!updatePlan.includes("TanushV/cascade.git#main")) throw new Error(`Self-update plan is incorrect: ${updatePlan}`);
+
+  console.log(`Standalone package, isolation, compaction, update, and Git-source smoke tests passed: ${cascadeTarball}`);
 } finally {
   if (process.env.CASCADE_SMOKE_KEEP !== "1") rmSync(temporary, { recursive: true, force: true });
   else console.log(`Smoke workspace retained at ${temporary}`);

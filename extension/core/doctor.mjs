@@ -51,8 +51,12 @@ export function runDoctor({ config, cwd, packageRoot, validation, sources = [] }
   add("Configuration", validation.errors.length === 0, validation.errors.length ? validation.errors.join("; ") : "valid");
   for (const warning of validation.warnings) add("Configuration warning", true, warning, "warning");
 
-  const workerPolicy = evaluateContributorPolicy(config, config.worker);
-  add("Worker data policy", workerPolicy.allowed, workerPolicy.reason);
+  if (config.worker?.selectionMode === "configured") {
+    const workerPolicy = evaluateContributorPolicy(config, config.worker);
+    add("Worker data policy", workerPolicy.allowed, workerPolicy.reason);
+  } else {
+    add("Worker data policy", true, "native TUI model; policy is evaluated when a model is selected", "info");
+  }
   if (config.mode === "dual") {
     const expertPolicy = evaluateContributorPolicy(config, config.expert);
     add("Expert data policy", expertPolicy.allowed, expertPolicy.reason);

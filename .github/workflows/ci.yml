@@ -39,6 +39,9 @@ jobs:
           cache: npm
       - name: Install pinned dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install pseudo-terminal test dependency
+        if: runner.os != 'Windows'
+        run: python3 -m pip install --user pexpect
       - name: Test, static checks, legal checks, and package smoke tests
         run: npm run ci
 
@@ -64,3 +67,6 @@ jobs:
           "$PREFIX/bin/cascade" --version
           "$PREFIX/bin/cascade" self-test
           "$PREFIX/bin/cascade" runtime
+          "$PREFIX/bin/cascade" paths
+          "$PREFIX/bin/cascade" compaction show
+          "$PREFIX/bin/cascade" update --dry-run

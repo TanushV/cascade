@@ -1,12 +1,29 @@
 # Configuration reference
 
+For normal use, configure Cascade inside the TUI:
+
+```text
+/login openrouter
+/model
+/cascade-setup
+```
+
+The TUI can persist settings for the current session, the current project, or all Cascade projects. JSON is the automation and advanced-provider interface, not a startup requirement.
+
+Cascade keeps application state separate from Pi:
+
+- `~/.cascade/agent/settings.json`: engine and global compaction settings
+- `~/.cascade/agent/auth.json`: Cascade provider credentials
+- `~/.config/cascade/config.json`: global orchestration settings
+- `<repo>/.cascade/config.json`: trusted project orchestration settings
+
 Configuration is merged in this order:
 
-1. built-in defaults;
+1. built-in safe defaults;
 2. `~/.config/cascade/config.json`;
 3. trusted project `.cascade/config.json`;
 4. an explicit `--cascade-config` file;
-5. environment and wrapper overrides.
+5. environment and CLI overrides.
 
 Objects merge recursively. Arrays replace earlier arrays.
 
@@ -15,7 +32,7 @@ Objects merge recursively. Arrays replace earlier arrays.
 ```json
 {
   "schemaVersion": 1,
-  "mode": "dual",
+  "mode": "single",
   "piBinary": "auto",
   "worker": {},
   "expert": {},
@@ -49,17 +66,24 @@ cascade self-test
 
 ```json
 {
+  "selectionMode": "configured",
+  "thinkingMode": "configured",
   "provider": "openrouter",
   "model": "vendor/model-id",
   "thinking": "high",
-  "tools": ["read", "grep", "find", "ls", "bash"],
+  "restrictTools": false,
+  "tools": ["read", "grep", "find", "ls", "bash", "edit", "write"],
   "instructions": "Profile-specific instructions",
   "timeoutMs": 600000,
   "maxOutputCharacters": 120000
 }
 ```
 
-`provider`, `model`, `thinking`, `tools`, and `instructions` are supported for both roles. `timeoutMs` and `maxOutputCharacters` govern isolated expert episodes.
+`selectionMode: "native"` makes the worker follow the model selected in Cascade's `/model` interface. `selectionMode: "configured"` pins the profile to `provider` and `model`. `thinkingMode` behaves the same way for thinking level.
+
+`restrictTools` defaults to `false`. In that mode Cascade inherits the engine's entire active tool set, including Cascade-only extension tools. The `tools` array becomes an allowlist only when `restrictTools` is explicitly true.
+
+`timeoutMs` and `maxOutputCharacters` govern isolated expert episodes.
 
 Valid thinking levels follow Pi: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Pi clamps unsupported levels to model capability.
 
@@ -187,7 +211,7 @@ Valid classifications are `public`, `internal`, `confidential`, `regulated`, and
 }
 ```
 
-Persistent evidence lives under `~/.local/state/cascade/sessions/` unless `CASCADE_STATE_DIR` is set.
+Persistent orchestration evidence lives under `~/.local/state/cascade/sessions/` unless `CASCADE_STATE_DIR` is set. Engine sessions live separately under `~/.cascade/agent/sessions/`.
 
 ## Verification
 
@@ -288,3 +312,25 @@ A sandbox command is an argument array and may contain `{python}`, `{script}`, a
 | `CASCADE_STATE_DIR` | Root for Cascade runtime state |
 
 Wrapper flags map to these variables for one process. The JSON file remains the authoritative way to configure every nested policy field.
+
+
+## Global compaction
+
+Global Cascade compaction settings are stored in `~/.cascade/agent/settings.json`:
+
+```json
+{
+  "quietStartup": true,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  }
+}
+```
+
+Use `cascade compaction show`, `cascade compaction set`, or `/cascade-compaction` rather than editing the file directly.
+
+## Updates
+
+`cascade update` and `cascade pull` reinstall the configured Git/npm source into the current global npm prefix. Override the source with `--source` or `CASCADE_UPDATE_SOURCE` when testing a controlled branch or release.

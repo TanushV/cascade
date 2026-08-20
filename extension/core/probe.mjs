@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { truncateText } from "./util.mjs";
 import { spawnPi } from "./pi-runtime.mjs";
+import { getCascadeAgentDir, getCascadeSessionDir } from "./cascade-paths.mjs";
 
 export async function probeModelProfile({ config, profile, cwd, extensionPath, probeExtensionPath, timeoutMs = 120000 }) {
   const temporaryDirectory = mkdtempSync(join(tmpdir(), "cascade-probe-"));
@@ -37,6 +38,8 @@ export async function probeModelProfile({ config, profile, cwd, extensionPath, p
       cwd,
       env: {
         ...process.env,
+        PI_CODING_AGENT_DIR: getCascadeAgentDir(),
+        PI_CODING_AGENT_SESSION_DIR: getCascadeSessionDir(),
         CASCADE_CHILD: "1",
         CASCADE_CONFIG: configPath,
         AI_AGENT: "cascade-probe"

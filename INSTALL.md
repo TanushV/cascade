@@ -1,58 +1,97 @@
-# Installation
+# Installation and update
 
-Cascade requires Node.js 22.19.0 or newer. A separate global Pi installation is not required; npm installs the pinned Pi runtime dependency automatically.
+## Requirements
 
-## Install from GitHub
+- Node.js 22.19.0 or newer
+- npm
+- Git
+- Internet access for installation and provider use
 
-Install the latest `main` branch:
+## First installation
 
 ```bash
 npm install -g github:TanushV/cascade --ignore-scripts
 ```
 
-For reproducible use, install the tagged release:
+Do not install Pi separately. Cascade installs its pinned engine dependency inside its own package.
 
-```bash
-npm install -g github:TanushV/cascade#v0.1.3 --ignore-scripts
-```
-
-Verify the installation:
+Verify:
 
 ```bash
 cascade --version
 cascade self-test
-cascade runtime
+cascade paths
 ```
 
-## Install from a release tarball
-
-Download `cascade-0.1.3.tgz` from the GitHub release and run:
-
-```bash
-npm install -g /absolute/path/to/cascade-0.1.3.tgz --ignore-scripts
-```
-
-## Configure a repository
+## Start
 
 ```bash
 cd /path/to/repository
-cascade init
+cascade
 ```
 
-The generated configuration starts with `privacy.classification` set to `unknown` and `allowContributor` set to `false`. Explicitly classify the repository before enabling any endpoint whose terms permit training or retention.
-
-Set provider credentials in your shell or secret manager, then validate the live endpoints:
+No `cascade init` is required. Use `--approve` only when you want trusted project-local `.cascade` configuration or extensions:
 
 ```bash
-export OPENROUTER_API_KEY="..."
-export MODEL_API_KEY="..."
-cascade doctor --approve
-cascade probe worker --approve
-cascade probe expert --approve
+cascade --approve
 ```
 
-## Uninstall
+Authenticate and configure inside the TUI:
+
+```text
+/login openrouter
+/model
+/cascade-setup
+```
+
+Credentials are stored under `~/.cascade/agent/auth.json`. Pi's `~/.pi` data is not imported.
+
+## Update
+
+After the first installation:
+
+```bash
+cascade update
+```
+
+Equivalent alias:
+
+```bash
+cascade pull
+```
+
+Preview the update command:
+
+```bash
+cascade update --dry-run
+```
+
+## Global compaction settings
+
+```bash
+cascade compaction show
+cascade compaction set --reserve-tokens 16384 --keep-recent-tokens 20000
+```
+
+The settings apply to all Cascade projects and are stored in `~/.cascade/agent/settings.json`.
+
+## Remove an old installation
+
+Only use this when replacing an older broken package or changing Node installations:
 
 ```bash
 npm uninstall -g cascade
+npm install -g github:TanushV/cascade --ignore-scripts
 ```
+
+Cascade project configuration and credentials are not deleted by npm uninstall.
+
+## Uninstall completely
+
+```bash
+npm uninstall -g cascade
+rm -rf ~/.cascade
+rm -rf ~/.config/cascade
+```
+
+The final two commands permanently remove Cascade credentials, settings, sessions, extensions, and global orchestration configuration.

@@ -36,6 +36,8 @@ test("single mode never admits expert", () => {
 
 test("dual mode automatically admits an expert only after the consult threshold", () => {
   const config = deepClone(DEFAULT_CONFIG);
+  config.mode = "dual";
+  config.routing.autoConsult = true;
   const router = new AdaptiveRouter(config);
   const ledger = { totals: () => ({ expertCalls: 0, expertCostUsd: 0, estimatedTotalCostUsd: 0 }) };
   router.onTurnStart(1);

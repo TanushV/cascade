@@ -12,10 +12,21 @@ import { evaluateContributorPolicy } from "../extension/core/privacy.mjs";
 import { probeModelProfile } from "../extension/core/probe.mjs";
 import { runtimeSummary, spawnPi } from "../extension/core/pi-runtime.mjs";
 import { atomicWriteJson } from "../extension/core/util.mjs";
+import {
+  discoverCascadeResources,
+  ensureCascadeAgentLayout,
+  getCascadeAgentDir,
+  getCascadeAuthPath,
+  getCascadeHome,
+  getCascadeSessionDir,
+  getCascadeSettingsPath
+} from "../extension/core/cascade-paths.mjs";
+import { getCascadeGlobalCompaction, writeCascadeGlobalCompaction } from "../extension/core/pi-settings.mjs";
+import { runSelfUpdate } from "../extension/core/updater.mjs";
 
 const BIN_PATH = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = dirname(dirname(BIN_PATH));
-const EXTENSION_PATH = join(PACKAGE_ROOT, "extension", "index.mjs");
+const EXTENSION_PATH = join(PACKAGE_ROOT, "extension", "cascade.mjs");
 
 function usage() {
   return `Cascade
@@ -29,7 +40,10 @@ Usage:
   cascade eval MANIFEST [--output FILE]
   cascade probe worker|expert [cascade options]
   cascade runtime
+  cascade paths
   cascade self-test
+  cascade compaction show|set [--enabled true|false] [--reserve-tokens N] [--keep-recent-tokens N]
+  cascade update|pull [--dry-run] [--force] [--source NPM_OR_GIT_SPEC]
 
 Cascade options:
   --cascade-config FILE
@@ -154,28 +168,55 @@ function effectiveConfig({ cwd, parsed, passthrough }) {
 async function runPi(argv) {
   const parsed = parseCascadeOptions(argv);
   const cwd = process.cwd();
-  const loaded = effectiveConfig({ cwd, parsed, passthrough: parsed.passthrough });
-  const { config, env, projectTrusted } = loaded;
-  const workerPolicy = evaluateContributorPolicy(config, config.worker);
-  if (!workerPolicy.allowed) throw new Error(`Worker endpoint blocked: ${workerPolicy.reason}`);
-  if (config.mode === "dual") {
-    const expertPolicy = evaluateContributorPolicy(config, config.expert);
-    if (!expertPolicy.allowed) throw new Error(`Expert endpoint blocked: ${expertPolicy.reason}`);
-  }
-  if (!existsSync(EXTENSION_PATH)) throw new Error(`Cascade extension is missing: ${EXTENSION_PATH}`);
+  const env = { ...process.env, ...parsed.env };
+  const projectTrusted = isProjectApproved(parsed.passthrough);
+  if (projectTrusted) env.CASCADE_PROJECT_TRUSTED = "1";
 
+  let loaded;
+  let startupWarning = "";
+  try {
+    loaded = loadEffectiveConfig({
+      cwd,
+      projectTrusted,
+      explicitPath: parsed.explicitConfig,
+      env,
+      throwOnError: false
+    });
+    if (loaded.validation.errors.length) {
+      startupWarning = `Configuration warning: ${loaded.validation.errors.join("; ")}`;
+    }
+  } catch (error) {
+    loaded = { config: structuredClone(DEFAULT_CONFIG), validation: { errors: [], warnings: [] } };
+    startupWarning = `Configuration warning: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const config = loaded.config || structuredClone(DEFAULT_CONFIG);
+  if (!existsSync(EXTENSION_PATH)) throw new Error(`Cascade application module is missing: ${EXTENSION_PATH}`);
+
+  const agentDir = ensureCascadeAgentLayout(env);
+  const resources = discoverCascadeResources({ cwd, projectTrusted, env });
   const piArgs = [
-    "--extension", EXTENSION_PATH,
-    "--provider", config.worker.provider,
-    "--model", config.worker.model,
-    "--thinking", config.worker.thinking,
-    ...parsed.passthrough
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-themes",
+    "--extension", EXTENSION_PATH
   ];
+  for (const extension of resources.extensions) piArgs.push("--extension", extension);
+  for (const skill of resources.skills) piArgs.push("--skill", skill);
+  for (const prompt of resources.prompts) piArgs.push("--prompt-template", prompt);
+  for (const theme of resources.themes) piArgs.push("--theme", theme);
+  piArgs.push(...parsed.passthrough);
+
   const childEnv = {
     ...env,
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_SESSION_DIR: getCascadeSessionDir(env),
+    PI_TELEMETRY: env.PI_TELEMETRY ?? "0",
+    AI_AGENT: "cascade",
     CASCADE_PACKAGE_ROOT: PACKAGE_ROOT,
     CASCADE_EXTENSION_PATH: EXTENSION_PATH,
-    CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0"
+    CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",
+    ...(startupWarning ? { CASCADE_STARTUP_WARNING: startupWarning } : {})
   };
   if (parsed.explicitConfig) childEnv.CASCADE_CONFIG = resolve(parsed.explicitConfig);
 
@@ -198,7 +239,7 @@ function parseCommandFlags(args) {
     const arg = args[i];
     if (!arg.startsWith("--")) { result.positional.push(arg); continue; }
     const key = arg.slice(2);
-    if (["force", "global", "approve", "expert-reviewed", "no-isolation"].includes(key)) result[key] = true;
+    if (["force", "global", "approve", "expert-reviewed", "no-isolation", "dry-run"].includes(key)) result[key] = true;
     else {
       result[key] = takeValue(args, i, arg);
       i += 1;
@@ -342,17 +383,76 @@ async function evalCommand(args) {
   if (report.accepted !== report.taskCount) process.exitCode = 1;
 }
 
+function parseBooleanFlag(value, name) {
+  if (value === undefined) return undefined;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  throw new Error(`${name} must be true or false`);
+}
+
+function compactionCommand(args) {
+  const flags = parseCommandFlags(args);
+  const [action = "show"] = flags.positional;
+  if (action === "show") {
+    console.log(JSON.stringify(getCascadeGlobalCompaction(), null, 2));
+    return;
+  }
+  if (action !== "set") throw new Error("Usage: cascade compaction show|set [options]");
+  const patch = {};
+  if (flags.enabled !== undefined) patch.enabled = parseBooleanFlag(flags.enabled, "--enabled");
+  if (flags["reserve-tokens"] !== undefined) patch.reserveTokens = Number(flags["reserve-tokens"]);
+  if (flags["keep-recent-tokens"] !== undefined) patch.keepRecentTokens = Number(flags["keep-recent-tokens"]);
+  const result = writeCascadeGlobalCompaction(patch);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function updateCommand(args) {
+  const flags = parseCommandFlags(args);
+  const result = await runSelfUpdate({
+    dryRun: Boolean(flags["dry-run"]),
+    force: Boolean(flags.force),
+    source: flags.source,
+    currentVersion: PACKAGE_VERSION
+  });
+  if (result.dryRun) {
+    console.log(`${result.command} ${result.args.map((value) => JSON.stringify(value)).join(" ")}`);
+    return;
+  }
+  if (result.skipped) {
+    console.log(result.reason);
+    return;
+  }
+  console.log(`Cascade updated${result.remoteVersion ? ` to ${result.remoteVersion}` : ""}. Restart any running Cascade sessions.`);
+}
+
 function runtimeCommand() {
   const summary = runtimeSummary({ piBinary: "auto" });
   console.log(JSON.stringify({ cascadeVersion: PACKAGE_VERSION, runtime: summary }, null, 2));
   if (!summary.ok) process.exitCode = 1;
 }
 
+function pathsCommand() {
+  const env = process.env;
+  const agentDir = ensureCascadeAgentLayout(env);
+  console.log(JSON.stringify({
+    home: getCascadeHome(env),
+    agentDir,
+    settings: getCascadeSettingsPath(env),
+    auth: getCascadeAuthPath(env),
+    sessions: getCascadeSessionDir(env),
+    globalConfig: getGlobalConfigPath(env),
+    projectConfig: getProjectConfigPath(process.cwd(), env)
+  }, null, 2));
+}
+
 function selfTestCommand() {
   const checks = [];
   const add = (name, ok, detail = "") => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
   add("Cascade package", existsSync(BIN_PATH), BIN_PATH);
-  add("Cascade extension", existsSync(EXTENSION_PATH), EXTENSION_PATH);
+  add("Cascade application", existsSync(EXTENSION_PATH), EXTENSION_PATH);
+  const agentDir = ensureCascadeAgentLayout(process.env);
+  add("Isolated Cascade state", agentDir.includes(`${join(".cascade", "agent")}`) && !agentDir.includes(`${join(".pi", "agent")}`), agentDir);
   const validation = validateConfig({ ...DEFAULT_CONFIG, ...createExampleConfig() });
   add("Example configuration", validation.errors.length === 0, validation.errors.join("; ") || "valid");
   const runtime = runtimeSummary({ piBinary: "auto" });
@@ -378,7 +478,10 @@ async function main() {
     return;
   }
   if (command === "runtime") return runtimeCommand();
+  if (command === "paths") return pathsCommand();
   if (command === "self-test") return selfTestCommand();
+  if (command === "compaction") return compactionCommand(argv.slice(1));
+  if (command === "update" || command === "pull") return await updateCommand(argv.slice(1));
   if (command === "init") return initCommand(argv.slice(1));
   if (command === "doctor") return doctorCommand(argv.slice(1));
   if (command === "config") return configCommand(argv.slice(1));

@@ -24,15 +24,15 @@ jobs:
           node-version: 22.19.0
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Materialize and validate the verified source tree
+      - name: Apply and validate the verified Cascade patch
         shell: bash
         run: |
           set -euo pipefail
-          cat .publish/chunk-* | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
-          echo "5b8f78dde762b54bd547d2d0e8ac1c2aa8b9a52bbcd261426f4bc91cc9500bb2  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
-          mkdir -p "$RUNNER_TEMP/cascade-source"
-          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
-          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+          cat .publish/chunk-* | base64 --decode > "$RUNNER_TEMP/cascade.patch.gz"
+          echo "c8a4418226a8ee3f8ccccd146557536fd2738d2848181f03c7add89d04792e15  $RUNNER_TEMP/cascade.patch.gz" | sha256sum --check --strict
+          gzip -dc "$RUNNER_TEMP/cascade.patch.gz" > "$RUNNER_TEMP/cascade.patch"
+          git apply --index --whitespace=nowarn "$RUNNER_TEMP/cascade.patch"
+          rm -rf .publish .github/workflows/materialize-cascade-0.4.yml
           python3 -m pip install --user pexpect
           npm ci --ignore-scripts --no-audit --no-fund
           npm run ci

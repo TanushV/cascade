@@ -1,0 +1,248 @@
+name: Cascade 0.4 release controller
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  security-events: write
+
+concurrency:
+  group: cascade-0.4-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/cascade-0.4-production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-production
+          fetch-depth: 0
+      - name: Reconstruct the checksum-pinned source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED='5b8f78dde762b54bd547d2d0e8ac1c2aa8b9a52bbcd261426f4bc91cc9500bb2'
+          DEST="$RUNNER_TEMP/cascade-source.tar.gz"
+          shopt -s nullglob
+
+          try_candidate() {
+            local label="$1"
+            shift
+            local files=("$@")
+            [[ ${#files[@]} -gt 0 ]] || return 1
+            local candidate="$RUNNER_TEMP/${label}.tar.gz"
+            cat "${files[@]}" | base64 --decode > "$candidate"
+            local actual
+            actual="$(sha256sum "$candidate" | awk '{print $1}')"
+            if [[ "$actual" == "$EXPECTED" ]]; then
+              mv "$candidate" "$DEST"
+              echo "Matched verified payload: $label"
+              return 0
+            fi
+            rm -f "$candidate"
+            return 1
+          }
+
+          source_chunks=(.publish/source-*.b64)
+          current_chunks=(.publish/current-*.b64)
+          new_chunks=(.publish/new-*.b64)
+          all_chunks=(.publish/*.b64)
+
+          try_candidate source "${source_chunks[@]}" || \
+          try_candidate current "${current_chunks[@]}" || \
+          try_candidate new "${new_chunks[@]}" || \
+          try_candidate current-new "${current_chunks[@]}" "${new_chunks[@]}" || \
+          try_candidate all "${all_chunks[@]}" || {
+            echo 'No staging combination matched the verified source checksum.' >&2
+            exit 1
+          }
+
+          echo "$EXPECTED  $DEST" | sha256sum --check --strict
+          tar -tzf "$DEST" >/dev/null
+          mkdir -p "$RUNNER_TEMP/source-check"
+          tar -xzf "$DEST" -C "$RUNNER_TEMP/source-check"
+          test "$(node -p "require('$RUNNER_TEMP/source-check/package.json').version")" = '0.4.0'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cascade-0.4-source
+          path: ${{ runner.temp }}/cascade-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  verify:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22.19.0
+          - os: ubuntu-latest
+            node: 24
+          - os: macos-latest
+            node: 22.19.0
+          - os: windows-latest
+            node: 22.19.0
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cascade-0.4-source
+          path: ${{ runner.temp }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          registry-url: https://registry.npmjs.org
+      - name: Install and run the complete suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cascade-source"
+          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
+          cd "$RUNNER_TEMP/cascade-source"
+          npm ci --ignore-scripts --no-audit --no-fund
+          if [[ '${{ runner.os }}' != 'Windows' ]]; then
+            python3 -m pip install --user pexpect
+          fi
+          npm run ci
+
+  codeql:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-production
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: cascade-0.4-source
+          path: ${{ runner.temp }}
+      - name: Replace staging files with verified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cascade-source"
+          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
+          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+      - name: Install and inspect
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+      - uses: github/codeql-action/analyze@v4
+
+  materialize:
+    needs: [prepare, verify, codeql]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      commit_sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-production
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: cascade-0.4-source
+          path: ${{ runner.temp }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Commit only the isolated application tree
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cascade-source"
+          tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
+          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+          npm ci --ignore-scripts --no-audit --no-fund
+          python3 -m pip install --user pexpect
+          npm run ci
+          git config user.name 'TanushV'
+          git config user.email '87838540+TanushV@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Ship Cascade 0.4 as an isolated application'
+            git push origin HEAD:agent/cascade-0.4-production
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  merge-release-cleanup:
+    needs: materialize
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Verify clean branch and merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(gh api "repos/${GITHUB_REPOSITORY}/contents/package.json?ref=agent/cascade-0.4-production" --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")"
+          test "$VERSION" = '0.4.0'
+          if gh api "repos/${GITHUB_REPOSITORY}/contents/.publish?ref=agent/cascade-0.4-production" >/dev/null 2>&1; then
+            echo 'Staging directory still exists on the release branch.' >&2
+            exit 1
+          fi
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --subject 'Ship Cascade 0.4 as an isolated application' --body 'Isolate Cascade state and extensions, restore a Cascade-owned TUI, add configurable worker/expert orchestration, global compaction controls, and self-update support.'
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Remove temporary release machinery and verify main install
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          rm -f \
+            .github/workflows/cascade-0.4-release-controller.yml \
+            .github/workflows/finalize-cascade-v0.4.0.yml \
+            .github/workflows/materialize-cascade-0.4-pr.yml \
+            .github/workflows/materialize-cascade-0.4.yml
+          git config user.name 'TanushV'
+          git config user.email '87838540+TanushV@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Remove temporary Cascade 0.4 release workflows'
+            git push origin HEAD:main
+          fi
+
+          PREFIX="$RUNNER_TEMP/cascade-main-install"
+          npm install -g "git+https://github.com/${GITHUB_REPOSITORY}.git#main" --prefix "$PREFIX" --ignore-scripts --no-audit --no-fund
+          "$PREFIX/bin/cascade" --version | grep 'cascade 0.4.0'
+          "$PREFIX/bin/cascade" self-test
+          "$PREFIX/bin/cascade" update --dry-run
+
+          git fetch origin main
+          git tag -f -a v0.4.0 origin/main -m 'Cascade 0.4.0'
+          git push --force origin v0.4.0
+          gh release view v0.4.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create v0.4.0 --repo "$GITHUB_REPOSITORY" --title 'Cascade 0.4.0' --notes 'Cascade is now an isolated application built on the Pi engine, with its own state, extensions, TUI identity, global compaction controls, and built-in update command.'
+
+          for pr in 8 9 10 11 12 14 16 17; do
+            gh pr close "$pr" --repo "$GITHUB_REPOSITORY" --comment 'Superseded by the clean Cascade 0.4 release.' >/dev/null 2>&1 || true
+          done

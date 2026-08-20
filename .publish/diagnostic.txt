@@ -1,0 +1,3009 @@
+HEAD=3d7387066ba40b7096006ffd0f232938bb0261e8
+BASE_FILES=88
+total 72
+-rw-r--r-- 1 runner runner   174 Aug 20 01:28 READY
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-00.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-01.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-02.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-03.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-04.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-05.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-06.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-07.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-08.b64
+-rw-r--r-- 1 runner runner  4000 Aug 20 01:28 current-09.b64
+-rw-r--r-- 1 runner runner  3704 Aug 20 01:28 current-10.b64
+-rw-r--r-- 1 runner runner    60 Aug 20 01:28 diagnostic.txt
+-rw-r--r-- 1 runner runner 12000 Aug 20 01:28 new-00.b64
+-rw-r--r-- 1 runner runner  5744 Aug 20 01:28 new-01.b64
+===== concatenate_patch =====
+STATUS concatenate_patch=0
+===== patch_digest =====
+f3817e3b59825bef1b944c09e706dd73c8c163cc46d0a0a4340bfea3a64128b3  /home/runner/work/_temp/cascade.patch.gz
+STATUS patch_digest=0
+===== patch_digest_check =====
+/home/runner/work/_temp/cascade.patch.gz: OK
+STATUS patch_digest_check=0
+===== decompress_patch =====
+diff --git a/.export-source b/.export-source
+deleted file mode 100644
+index 859015a..0000000
+--- a/.export-source
++++ /dev/null
+@@ -1 +0,0 @@
+-native-pi-tui-parity
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index ad5c615..bd76850 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -39,6 +39,9 @@ jobs:
+           cache: npm
+       - name: Install pinned dependencies
+         run: npm ci --ignore-scripts --no-audit --no-fund
++      - name: Install pseudo-terminal test dependency
++        if: runner.os != 'Windows'
++        run: python3 -m pip install --user pexpect
+       - name: Test, static checks, legal checks, and package smoke tests
+         run: npm run ci
+ 
+@@ -64,3 +67,6 @@ jobs:
+           "$PREFIX/bin/cascade" --version
+           "$PREFIX/bin/cascade" self-test
+           "$PREFIX/bin/cascade" runtime
++          "$PREFIX/bin/cascade" paths
++          "$PREFIX/bin/cascade" compaction show
++          "$PREFIX/bin/cascade" update --dry-run
+diff --git a/.github/workflows/export-source.yml b/.github/workflows/export-source.yml
+deleted file mode 100644
+index f544e83..0000000
+--- a/.github/workflows/export-source.yml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: Export source for local TUI development
+-
+-on:
+-  push:
+-    branches:
+-      - agent/native-pi-tui-parity
+-    paths:
+-      - .export-source
+-  pull_request:
+-    branches:
+-      - main
+-
+-permissions:
+-  contents: read
+-
+-jobs:
+-  export:
+-    if: github.head_ref == 'agent/native-pi-tui-parity' || github.ref_name == 'agent/native-pi-tui-parity'
+-    runs-on: ubuntu-latest
+-    timeout-minutes: 20
+-    steps:
+-      - uses: actions/checkout@v7
+-      - uses: actions/setup-node@v7
+-        with:
+-          node-version: 22.19.0
+-          registry-url: https://registry.npmjs.org
+-          cache: npm
+-      - name: Install pinned dependencies
+-        run: npm ci --ignore-scripts --no-audit --no-fund
+-      - name: Build local-development archive
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          tar --exclude='./.git' --exclude='./dist' -czf "$RUNNER_TEMP/cascade-source.tgz" .
+-      - uses: actions/upload-artifact@v4
+-        with:
+-          name: cascade-source
+-          path: ${{ runner.temp }}/cascade-source.tgz
+-          if-no-files-found: error
+-          retention-days: 1
+diff --git a/.gitignore b/.gitignore
+index e36c37b..707fc06 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -13,3 +13,6 @@ coverage/
+ *.zip
+ *.tar.gz
+ npm-debug.log*
++
++__pycache__/
++*.pyc
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 09bacc3..edea24c 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,30 @@
+ # Changelog
+ 
++## 0.4.0 - 2026-08-19
++
++### Changed
++
++- Cascade now has an isolated application home under `~/.cascade/agent` and no longer imports Pi settings, credentials, sessions, global context, or extensions.
++- Replaced the Pi startup identity with Cascade-owned header, footer, terminal title, resource discovery, and state paths while retaining the Pi engine internally.
++- The default worker uses native Cascade `/model` selection, starts in single mode, inherits all active tools, and does not require configuration to open.
++- Project initialization is optional rather than a startup prerequisite.
++
++### Added
++
++- `/cascade-setup`, `/cascade-worker`, `/cascade-expert`, `/cascade-auth`, and `/cascade-compaction` TUI flows.
++- `cascade update` / `cascade pull` for in-place updates.
++- Global compaction controls via `cascade compaction show|set`.
++- `cascade paths` for inspecting isolated application locations.
++- Real pseudo-terminal isolation tests and a real no-key agent/tool execution test.
++
++### Fixed
++
++- Old or blocked Contributor profiles no longer prevent Cascade from starting.
++- Pi-only extensions and global context can no longer leak into Cascade.
++- Cascade no longer forces a model, provider, thinking level, or tool allowlist before the TUI starts.
++- Removed obsolete source-overlay and fork-bootstrap tooling from the distributed application.
++
++
+ ## 0.2.0 - 2026-08-18
+ 
+ ### Changed
+diff --git a/INSTALL.md b/INSTALL.md
+index a638227..314e07b 100644
+--- a/INSTALL.md
++++ b/INSTALL.md
+@@ -1,58 +1,97 @@
+-# Installation
++# Installation and update
+ 
+-Cascade requires Node.js 22.19.0 or newer. A separate global Pi installation is not required; npm installs the pinned Pi runtime dependency automatically.
++## Requirements
+ 
+-## Install from GitHub
++- Node.js 22.19.0 or newer
++- npm
++- Git
++- Internet access for installation and provider use
+ 
+-Install the latest `main` branch:
++## First installation
+ 
+ ```bash
+ npm install -g github:TanushV/cascade --ignore-scripts
+ ```
+ 
+-For reproducible use, install the tagged release:
++Do not install Pi separately. Cascade installs its pinned engine dependency inside its own package.
++
++Verify:
+ 
+ ```bash
+-npm install -g github:TanushV/cascade#v0.1.3 --ignore-scripts
++cascade --version
++cascade self-test
++cascade paths
+ ```
+ 
+-Verify the installation:
++## Start
+ 
+ ```bash
+-cascade --version
+-cascade self-test
+-cascade runtime
++cd /path/to/repository
++cascade
++```
++
++No `cascade init` is required. Use `--approve` only when you want trusted project-local `.cascade` configuration or extensions:
++
++```bash
++cascade --approve
++```
++
++Authenticate and configure inside the TUI:
++
++```text
++/login openrouter
++/model
++/cascade-setup
++```
++
++Credentials are stored under `~/.cascade/agent/auth.json`. Pi's `~/.pi` data is not imported.
++
++## Update
++
++After the first installation:
++
++```bash
++cascade update
+ ```
+ 
+-## Install from a release tarball
++Equivalent alias:
++
++```bash
++cascade pull
++```
+ 
+-Download `cascade-0.1.3.tgz` from the GitHub release and run:
++Preview the update command:
+ 
+ ```bash
+-npm install -g /absolute/path/to/cascade-0.1.3.tgz --ignore-scripts
++cascade update --dry-run
+ ```
+ 
+-## Configure a repository
++## Global compaction settings
+ 
+ ```bash
+-cd /path/to/repository
+-cascade init
++cascade compaction show
++cascade compaction set --reserve-tokens 16384 --keep-recent-tokens 20000
+ ```
+ 
+-The generated configuration starts with `privacy.classification` set to `unknown` and `allowContributor` set to `false`. Explicitly classify the repository before enabling any endpoint whose terms permit training or retention.
++The settings apply to all Cascade projects and are stored in `~/.cascade/agent/settings.json`.
+ 
+-Set provider credentials in your shell or secret manager, then validate the live endpoints:
++## Remove an old installation
++
++Only use this when replacing an older broken package or changing Node installations:
+ 
+ ```bash
+-export OPENROUTER_API_KEY="..."
+-export MODEL_API_KEY="..."
+-cascade doctor --approve
+-cascade probe worker --approve
+-cascade probe expert --approve
++npm uninstall -g cascade
++npm install -g github:TanushV/cascade --ignore-scripts
+ ```
+ 
+-## Uninstall
++Cascade project configuration and credentials are not deleted by npm uninstall.
++
++## Uninstall completely
+ 
+ ```bash
+ npm uninstall -g cascade
++rm -rf ~/.cascade
++rm -rf ~/.config/cascade
+ ```
++
++The final two commands permanently remove Cascade credentials, settings, sessions, extensions, and global orchestration configuration.
+diff --git a/README.md b/README.md
+index 36a1af0..aed5e54 100644
+--- a/README.md
++++ b/README.md
+@@ -2,182 +2,195 @@
+ 
+ [![CI](https://github.com/TanushV/cascade/actions/workflows/ci.yml/badge.svg)](https://github.com/TanushV/cascade/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+ 
+-> **Independent project:** Cascade is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works. “Pi” identifies compatibility with the upstream runtime.
++Cascade is a standalone terminal coding agent with an isolated application home, a native terminal UI, and optional one-worker/one-expert orchestration. It uses the MIT-licensed Pi coding-agent engine as a pinned runtime dependency, but it does not load your Pi configuration, sessions, context, or extensions.
+ 
+-Cascade is a standalone command-line coding agent with a configurable one- or two-model orchestration layer. You install and run `cascade`; a separate global `pi` installation is not required.
++Cascade is an independent project and is not affiliated with or endorsed by Pi, Mario Zechner, or Earendil Works.
+ 
+-It provides one active workspace-owning **worker**, one independently configured on-demand **expert**, evidence-centered handoffs, trajectory-conditioned escalation, deterministic verification, endpoint privacy controls, and a replay-gated harness-learning plane.
++## What is isolated
+ 
+-The implementation targets `@earendil-works/pi-coding-agent@0.84.2` at upstream commit `59a71b235dadb4ad0d67557a8abb0aaa093e68b4`. See [`UPSTREAM.json`](UPSTREAM.json).
++Cascade uses its own application directories:
+ 
+-## Install directly from GitHub
++```text
++~/.cascade/agent/auth.json          provider credentials
++~/.cascade/agent/settings.json      engine and compaction settings
++~/.cascade/agent/sessions/          Cascade sessions
++~/.cascade/agent/extensions/        Cascade-only extensions
++~/.cascade/agent/skills/            Cascade-only skills
++~/.config/cascade/config.json       global orchestration configuration
++<repo>/.cascade/config.json         trusted project configuration
++```
++
++It deliberately does not auto-load `~/.pi`, `.pi/extensions`, Pi sessions, or Pi global context. Project `AGENTS.md` files remain available because they describe the repository rather than another application.
++
++## Install
+ 
+-Requirements: Node.js `22.19.0` or newer, npm, and Internet access for the first installation.
++Requirements: Node.js 22.19.0 or newer, npm, Git, and Internet access for installation.
+ 
+ ```bash
+ npm install -g github:TanushV/cascade --ignore-scripts
+ ```
+ 
+-npm installs the pinned Pi runtime dependency automatically. A separate `npm install -g @earendil-works/pi-coding-agent` is not needed.
+-
+-Verify:
++A separate Pi installation is not required. Verify the installed application:
+ 
+ ```bash
+ cascade --version
+ cascade self-test
+-cascade runtime
++cascade paths
+ ```
+ 
+-Expected shape:
++## Start
+ 
+-```text
+-cascade 0.2.0
+-bundled-pi 0.84.2
++No initialization or model configuration is required merely to open Cascade:
++
++```bash
++cd /path/to/repository
++cascade
++```
++
++Use `cascade --approve` when you intentionally trust project-local `.cascade` resources and configuration.
++
++Inside the TUI:
+ 
+-Cascade self-test passed.
++```text
++/login openrouter       authenticate using Cascade's isolated credential store
++/model                   select the current worker model
++/cascade-setup           configure single/dual mode, expert, budgets, and privacy
++/cascade-worker          select native or fixed worker behavior
++/cascade-expert          select the expert model
+ ```
+ 
+-## Start using it
++Provider environment variables also work, but `/login` avoids shell-history and repository-file mistakes.
+ 
+-```bash
+-cd /path/to/your/repository
+-cascade init
++## Default behavior
++
++Cascade starts in single-model mode and uses the model selected in its own TUI. The worker inherits the full active tool set, including `read`, `write`, `edit`, `bash`, search tools, and Cascade-only extension tools. Cascade applies a tool allowlist only when `restrictTools` is explicitly enabled.
++
++Dual mode adds one independently configured expert:
++
++```text
++user task
++  -> worker owns the workspace
++  -> evidence, tests, and route signals accumulate
++  -> expert is consulted only when admitted or manually requested
++  -> worker continues, or an explicit bounded takeover edits the workspace
++  -> verification gate checks the final diff
+ ```
+ 
+-The generated configuration starts privacy-safe: repository classification is `unknown`, and Contributor endpoints are disabled until explicitly enabled.
++Normal consultations are read-only. Only one model owns workspace edits at a time.
++
++## TUI commands
++
++| Command | Purpose |
++|---|---|
++| `/cascade` | Show current mode, role, models, routing, budgets, and privacy |
++| `/cascade-setup` | Configure Cascade in the TUI and save session/project/global settings |
++| `/cascade-worker` | Choose native TUI model selection or a fixed worker model |
++| `/cascade-expert` | Choose the expert model |
++| `/cascade-auth [provider]` | Prepare the isolated native `/login` flow |
++| `/cascade-mode single\|dual` | Change orchestration mode for the current session |
++| `/cascade-consult <question>` | Run a bounded expert consultation |
++| `/cascade-takeover [objective]` | Explicitly authorize one bounded expert editing episode |
++| `/cascade-evidence [count]` | Inspect recent evidence records |
++| `/cascade-verify` | Discover and execute repository checks |
++| `/cascade-compaction` | View or edit global Cascade compaction settings |
++
++## Global compaction limits
+ 
+-Set credentials for the providers you configure, for example:
++Show the limits used across all Cascade projects:
+ 
+ ```bash
+-export OPENROUTER_API_KEY="..."
+-export MODEL_API_KEY="..."
++cascade compaction show
+ ```
+ 
+-Validate the installation and live endpoints:
++Set them globally:
+ 
+ ```bash
+-cascade doctor --approve
+-cascade probe worker --approve
+-cascade probe expert --approve
++cascade compaction set \
++  --enabled true \
++  --reserve-tokens 16384 \
++  --keep-recent-tokens 20000
+ ```
+ 
+-Launch interactively:
++These values are written to `~/.cascade/agent/settings.json`, not Pi's settings.
++
++## Update without uninstalling
++
++After the first installation:
+ 
+ ```bash
+-cascade --approve
++cascade update
+ ```
+ 
+-Or provide a task directly:
++`cascade pull` is an alias. Inspect the command without changing anything:
+ 
+ ```bash
+-cascade --approve \
+-  "Inspect this repository, implement the smallest correct fix, and run the relevant checks."
++cascade update --dry-run
+ ```
+ 
+-## Model configuration
++The default update source is the repository's `main` branch. A controlled source can be supplied with `--source` or `CASCADE_UPDATE_SOURCE`.
+ 
+-Both roles are fully configurable. Each can independently select provider and model ID, reasoning level, tool allowlist, role instructions, timeout and output limits, provider base URL, API adapter, headers, credential source, and cost budgets.
++## Provider and model configuration
+ 
+-Minimal dual-model example in `.cascade/config.json`:
++The ordinary path is `/login`, `/model`, and `/cascade-setup`. JSON remains available for automation and advanced endpoints.
++
++Example dual-mode project configuration:
+ 
+ ```json
+ {
+   "schemaVersion": 1,
+   "mode": "dual",
+   "worker": {
+-    "provider": "meta-model-api",
+-    "model": "muse-spark-1.2-contributor",
+-    "thinking": "medium",
+-    "tools": ["read", "grep", "find", "ls", "bash", "edit", "write"]
++    "selectionMode": "native",
++    "thinkingMode": "native",
++    "restrictTools": false
+   },
+   "expert": {
++    "selectionMode": "configured",
+     "provider": "openrouter",
+-    "model": "openrouter/auto",
++    "model": "vendor/frontier-model",
++    "thinkingMode": "configured",
+     "thinking": "high",
+-    "tools": ["read", "grep", "find", "ls", "bash"],
+-    "timeoutMs": 600000,
+-    "maxOutputCharacters": 120000
++    "restrictTools": false
++  },
++  "routing": {
++    "autoConsult": true
+   },
+   "privacy": {
+-    "classification": "public",
+-    "allowContributor": true
++    "classification": "confidential",
++    "allowContributor": false
+   }
+ }
+ ```
+ 
+-Single-model mode uses the same evidence, verification, privacy, checkpoint, and harness path while disabling expert admission:
+-
+-```bash
+-cascade --single \
+-  --worker openrouter/vendor/model-id \
+-  "Repair the bug and run the repository checks"
+-```
+-
+-## Runtime structure
+-
+-```text
+-user task
+-   ↓
+-configured worker owns the repository workspace
+-   ↓
+-evidence ledger + tests + route signals
+-   ├─ continue worker
+-   ├─ consult/review with expert
+-   ├─ bounded read-only expert investigation
+-   └─ explicitly authorized expert takeover
+-   ↓
+-verification + checkpoint + completion gate
+-```
++Contributor endpoints are denied unless the repository is classified `public` and explicit consent is enabled. A stale optional Contributor profile never prevents Cascade from opening.
+ 
+-Only one process owns edits at a time. Expert episodes receive a compact, redacted evidence packet rather than the entire parent transcript.
++## Validation
+ 
+-## Useful commands
++The test suite includes:
+ 
+-| Command | Purpose |
+-|---|---|
+-| `/cascade` | Show model profiles, budgets, routing state, privacy, and harness manifest |
+-| `/cascade-mode single\|dual` | Change mode for the current session |
+-| `/cascade-consult <question>` | Run a bounded read-only expert consultation |
+-| `/cascade-takeover [objective]` | Run one explicitly authorized expert editing episode |
+-| `/cascade-evidence [count]` | Show recent evidence records |
+-| `/cascade-verify` | Discover and execute repository checks |
+-| `/cascade-refine [focus]` | Generate one small evidence-backed harness proposal |
+-| `/cascade-privacy` | Display endpoint policy and denied paths |
++- a real pseudo-terminal launch that proves Cascade branding and rejects Pi-only state and extensions;
++- a real local agent loop that selects the built-in `write` tool, writes a file, consumes the tool result, and completes without API credentials;
++- single- and dual-model routing, evidence, verification, privacy, persistence, and expert-process tests;
++- npm tarball, global-prefix, and direct Git-source installation smoke tests;
++- update-plan and global-compaction persistence tests;
++- Linux, macOS, Windows, Node 22.19, Node 24, and CodeQL checks in GitHub Actions.
+ 
+-## Privacy boundary
++Live provider availability is account-specific. After authentication, validate selected configured profiles with:
+ 
+-A model whose identifier matches the Contributor pattern is denied unless both `privacy.allowContributor` is `true` and `privacy.classification` is `public`.
+-
+-Secret redaction and denied-path filtering are defense in depth, not a substitute for a real sandbox. Cascade and Pi extensions normally execute with the permissions of the launching user.
++```bash
++cascade probe worker --approve
++cascade probe expert --approve
++```
+ 
+ ## Development
+ 
+ ```bash
+ git clone https://github.com/TanushV/cascade.git
+ cd cascade
+-npm install --ignore-scripts
++npm ci --ignore-scripts
+ npm run ci
+ ```
+ 
+-## Validation
+-
+-The materialized source tree passed locally:
+-
+-- **45 automated tests, 0 failures**;
+-- static syntax/import checks across **42 packaged runtime modules**;
+-- legal and attribution consistency checks;
+-- standalone npm-tarball installation smoke tests;
+-- Git-source installation simulation;
+-- one- and two-model runtime, privacy, verification, persistence, replay, and takeover tests.
+-
+-GitHub Actions adds Linux, macOS, Windows, Node 22.19, Node 24, exact-commit GitHub installation, CodeQL, Dependabot, and tag-driven release automation.
+-
+-Live provider calls require your own credentials and are validated with `cascade probe worker` and `cascade probe expert`.
+-
+-## Legal and upstream attribution
+-
+-Cascade is MIT-licensed. Pi remains a separately installed MIT-licensed dependency; its source tree is not incorporated into Cascade's implementation. The repository preserves Pi's copyright and license notice and records the exact compatible package and commit.
+-
+-See [`LICENSE`](LICENSE), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt), [`UPSTREAM.json`](UPSTREAM.json), and [`docs/legal.md`](docs/legal.md).
++## Legal
+ 
+-This is an engineering licensing review, not formal legal advice.
++Cascade is MIT-licensed. Pi remains a separate pinned MIT-licensed dependency. Its original license notice is preserved in [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt), and integration details are recorded in [`UPSTREAM.json`](UPSTREAM.json) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+diff --git a/SECURITY.md b/SECURITY.md
+index f62d427..447e81c 100644
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -10,9 +10,9 @@ Use GitHub's private vulnerability-reporting feature for this repository when av
+ 
+ ## Important trust boundary
+ 
+-Cascade and Pi extensions execute with the permissions of the user who launches them. Model-generated shell commands and code are not automatically sandboxed. Use a container, virtual machine, or another external sandbox for untrusted repositories or generated code.
++Cascade and Cascade-installed extensions execute with the permissions of the user who launches them. Model-generated shell commands and code are not automatically sandboxed. Use a container, virtual machine, or another external sandbox for untrusted repositories or generated code.
+ 
+-Contributor-endpoint filtering and secret redaction are defense-in-depth controls, not a confidentiality guarantee. Keep Contributor endpoints disabled for non-public repositories.
++Cascade isolates Pi application state, but Contributor-endpoint filtering and secret redaction are defense-in-depth controls, not a confidentiality guarantee. Keep Contributor endpoints disabled for non-public repositories.
+ 
+ ## Dependency security
+ 
+diff --git a/TEST_REPORT.md b/TEST_REPORT.md
+index 74b2d0f..5603b12 100644
+--- a/TEST_REPORT.md
++++ b/TEST_REPORT.md
+@@ -1,67 +1,49 @@
+-# Cascade 0.2.0 Test Report
++# Cascade 0.4.0 Test Report
+ 
+-Prepared on 2026-08-18.
++## Scope
+ 
+-## Local validation results
++This release converts Cascade from a Pi wrapper with shared state into an isolated application built on the Pi engine. The validation focuses on startup, application identity, state separation, real tool use, packaging, updates, compaction, and the worker/expert orchestration layer.
+ 
+-| Check | Result |
+-|---|---:|
+-| Automated tests | **45 passed, 0 failed** |
+-| Static syntax/import checks | **42 JavaScript modules passed** |
+-| Legal and attribution checks | **Passed** |
+-| Package smoke tests | **Passed** |
+-| Clean local npm install | Passed |
+-| Clean-prefix global npm install | Passed |
+-| Git-source installation simulation | Passed |
+-| Automatic Pi runtime dependency installation | Passed using an isolated local registry |
+-| Installed CLI `--version` | Passed |
+-| Installed CLI `self-test` | Passed |
+-| Packaged Pi runtime resolution | Passed |
+-| No separately installed global `pi` command required | Passed |
+-| Real temporary Git worktree verification | Passed |
+-| Protocol-faithful expert subprocess | Passed |
+-| Source-tree overlay application | Passed |
+-| Cross-platform JavaScript entrypoint launch | Passed |
+-| Pi license attribution and version consistency | Passed |
++## Local validation
+ 
+-## Covered behavior
++Run with:
+ 
+-The automated suite covers:
++```bash
++npm run ci
++```
+ 
+-- standalone runtime resolution and external-runtime override;
+-- exact Node.js minimum-version comparison;
+-- cross-platform JavaScript entrypoint launch through Node;
+-- single-model and dual-model configuration;
+-- independent worker and expert provider, model, thinking, tools, instructions, timeout, output, and cost overrides;
+-- exact expert subprocess arguments and fail-closed execution;
+-- read-only consultation versus explicit workspace takeover;
+-- compact evidence handoffs and malformed-response fallback;
+-- OpenRouter and custom OpenAI-compatible provider registration;
+-- Contributor consent, repository classification, denied paths, image blocking, and secret redaction;
+-- append-only evidence persistence and long-session budget restoration;
+-- adaptive routing, threshold-gated consultation, verifier-failure escalation, cooldown, and session budgets;
+-- verifier discovery and execution against a real changed Git worktree;
+-- completion gating after repository mutation and rejection of false verifier lookalikes;
+-- scoped harness proposals, replay, canary activation, promotion, and rollback;
+-- optional programmatic workspace persistence, sandbox refusal, and timeout handling;
+-- provider capability-probe event processing;
+-- clean application into a temporary Pi-style source checkout.
++Validated behavior includes:
+ 
+-## GitHub publication validation
++- Cascade-branded header, footer, and terminal title;
++- no Pi startup header in the real terminal process;
++- no loading or execution of `~/.pi` extensions;
++- no loading of Pi global `AGENTS.md` context;
++- positive loading of `~/.cascade/agent/extensions`;
++- isolated auth, settings, sessions, extensions, skills, prompts, and themes;
++- safe startup with no configuration and no API credentials;
++- safe startup with an old blocked Contributor profile;
++- native worker model selection and full active tool inheritance;
++- explicit configured model selection and reversible tool restrictions;
++- real built-in `write` tool execution through the actual agent loop;
++- post-tool continuation and clean agent settlement;
++- global compaction persistence;
++- self-update command planning;
++- single- and dual-model routing, expert consultation/takeover, evidence, privacy, verification, and session recovery;
++- npm tarball, isolated global-prefix, and Git-source installation.
+ 
+-The repository includes:
++## Credential policy
+ 
+-- Linux, macOS, and Windows CI;
+-- Node.js 22.19 and Node.js 24 coverage;
+-- exact-commit installation directly from GitHub;
+-- CodeQL analysis;
+-- Dependabot for npm and GitHub Actions;
+-- tag-driven release artifact generation and GitHub Release publishing.
++No user API key is used by automated tests. Live provider validation is intentionally separate and account-specific.
+ 
+-The GitHub-source bootstrap reconstructs an exact locally tested archive and verifies SHA-256 `2ea552b01521022c9972b93ad6b2c889b91dbe4f9c64589e0051eb38a57e4c95` before materialization. Small fixes discovered by cross-platform CI are stored as ordinary, reviewable files in `.bootstrap/overlays/` and applied deterministically after the verified base tree.
++## Cross-platform validation
+ 
+-## Validation boundaries
++GitHub Actions is expected to run:
+ 
+-The build environment could not access the public npm or GitHub networks directly. The npm installation test therefore used a protocol-faithful local package fixture with the exact official Pi package name, version, exports, and executable layout. It validates package dependency installation, executable resolution, argument propagation, and process invocation, but it does not claim to have downloaded the public Pi tarball in that environment.
++- Ubuntu with Node 22.19;
++- Ubuntu with Node 24;
++- current macOS with Node 22.19;
++- current Windows with Node 22.19;
++- exact Git-source installation;
++- CodeQL JavaScript analysis.
+ 
+-Live Meta Model API and OpenRouter calls were not executed because the environment had neither user credentials nor outbound provider access. `cascade doctor`, `cascade probe worker`, and `cascade probe expert` validate real authentication, streaming, tool execution, and exact selected models on the user's machine.
++The final published commit and workflow conclusions should be treated as the release evidence, not an unmerged development branch.
+diff --git a/THIRD_PARTY_NOTICES.md b/THIRD_PARTY_NOTICES.md
+index 56f929c..a4f24be 100644
+--- a/THIRD_PARTY_NOTICES.md
++++ b/THIRD_PARTY_NOTICES.md
+@@ -10,7 +10,7 @@ Cascade depends on [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/pac
+ - License: MIT
+ - License copy: [`licenses/PI-LICENSE.txt`](licenses/PI-LICENSE.txt)
+ 
+-Cascade uses Pi through its published package, command-line interface, and public extension APIs. The Pi source tree is not vendored into this repository or into the Cascade npm tarball. npm installs the pinned Pi package as a separate runtime dependency, and that dependency retains its own package metadata and license.
++Cascade uses Pi through its published package APIs, engine CLI, terminal primitives, and public extension APIs while maintaining separate Cascade application state. The Pi source tree is not vendored into this repository or into the Cascade npm tarball. npm installs the pinned Pi package as a separate runtime dependency, and that dependency retains its own package metadata and license.
+ 
+ Cascade is an independent project. It is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works. The name “Pi” is used only to identify technical compatibility and the upstream runtime dependency.
+ 
+diff --git a/UPSTREAM.json b/UPSTREAM.json
+index 1a2a2bb..7bef56a 100644
+--- a/UPSTREAM.json
++++ b/UPSTREAM.json
+@@ -3,8 +3,8 @@
+   "commit": "59a71b235dadb4ad0d67557a8abb0aaa093e68b4",
+   "codingAgentPackage": "@earendil-works/pi-coding-agent",
+   "codingAgentVersion": "0.84.2",
+-  "integration": "Pi package and extension overlay using public extension APIs",
+-  "cascadeVersion": "0.2.0",
+-  "preparedOn": "2026-08-18",
+-  "runtimeDelivery": "npm dependency; no separate Pi install required"
++  "integration": "Independent Cascade application using Pi packages as an MIT-licensed engine dependency",
++  "cascadeVersion": "0.4.0",
++  "preparedOn": "2026-08-19",
++  "runtimeDelivery": "Bundled npm dependency with isolated Cascade state; no separate Pi installation required"
+ }
+diff --git a/bin/cascade.mjs b/bin/cascade.mjs
+index 8e65d69..87295b2 100755
+--- a/bin/cascade.mjs
++++ b/bin/cascade.mjs
+@@ -12,10 +12,21 @@ import { evaluateContributorPolicy } from "../extension/core/privacy.mjs";
+ import { probeModelProfile } from "../extension/core/probe.mjs";
+ import { runtimeSummary, spawnPi } from "../extension/core/pi-runtime.mjs";
+ import { atomicWriteJson } from "../extension/core/util.mjs";
++import {
++  discoverCascadeResources,
++  ensureCascadeAgentLayout,
++  getCascadeAgentDir,
++  getCascadeAuthPath,
++  getCascadeHome,
++  getCascadeSessionDir,
++  getCascadeSettingsPath
++} from "../extension/core/cascade-paths.mjs";
++import { getCascadeGlobalCompaction, writeCascadeGlobalCompaction } from "../extension/core/pi-settings.mjs";
++import { runSelfUpdate } from "../extension/core/updater.mjs";
+ 
+ const BIN_PATH = fileURLToPath(import.meta.url);
+ const PACKAGE_ROOT = dirname(dirname(BIN_PATH));
+-const EXTENSION_PATH = join(PACKAGE_ROOT, "extension", "index.mjs");
++const EXTENSION_PATH = join(PACKAGE_ROOT, "extension", "cascade.mjs");
+ 
+ function usage() {
+   return `Cascade
+@@ -29,7 +40,10 @@ Usage:
+   cascade eval MANIFEST [--output FILE]
+   cascade probe worker|expert [cascade options]
+   cascade runtime
++  cascade paths
+   cascade self-test
++  cascade compaction show|set [--enabled true|false] [--reserve-tokens N] [--keep-recent-tokens N]
++  cascade update|pull [--dry-run] [--force] [--source NPM_OR_GIT_SPEC]
+ 
+ Cascade options:
+   --cascade-config FILE
+@@ -154,28 +168,55 @@ function effectiveConfig({ cwd, parsed, passthrough }) {
+ async function runPi(argv) {
+   const parsed = parseCascadeOptions(argv);
+   const cwd = process.cwd();
+-  const loaded = effectiveConfig({ cwd, parsed, passthrough: parsed.passthrough });
+-  const { config, env, projectTrusted } = loaded;
+-  const workerPolicy = evaluateContributorPolicy(config, config.worker);
+-  if (!workerPolicy.allowed) throw new Error(`Worker endpoint blocked: ${workerPolicy.reason}`);
+-  if (config.mode === "dual") {
+-    const expertPolicy = evaluateContributorPolicy(config, config.expert);
+-    if (!expertPolicy.allowed) throw new Error(`Expert endpoint blocked: ${expertPolicy.reason}`);
++  const env = { ...process.env, ...parsed.env };
++  const projectTrusted = isProjectApproved(parsed.passthrough);
++  if (projectTrusted) env.CASCADE_PROJECT_TRUSTED = "1";
++
++  let loaded;
++  let startupWarning = "";
++  try {
++    loaded = loadEffectiveConfig({
++      cwd,
++      projectTrusted,
++      explicitPath: parsed.explicitConfig,
++      env,
++      throwOnError: false
++    });
++    if (loaded.validation.errors.length) {
++      startupWarning = `Configuration warning: ${loaded.validation.errors.join("; ")}`;
++    }
++  } catch (error) {
++    loaded = { config: structuredClone(DEFAULT_CONFIG), validation: { errors: [], warnings: [] } };
++    startupWarning = `Configuration warning: ${error instanceof Error ? error.message : String(error)}`;
+   }
+-  if (!existsSync(EXTENSION_PATH)) throw new Error(`Cascade extension is missing: ${EXTENSION_PATH}`);
++  const config = loaded.config || structuredClone(DEFAULT_CONFIG);
++  if (!existsSync(EXTENSION_PATH)) throw new Error(`Cascade application module is missing: ${EXTENSION_PATH}`);
+ 
++  const agentDir = ensureCascadeAgentLayout(env);
++  const resources = discoverCascadeResources({ cwd, projectTrusted, env });
+   const piArgs = [
+-    "--extension", EXTENSION_PATH,
+-    "--provider", config.worker.provider,
+-    "--model", config.worker.model,
+-    "--thinking", config.worker.thinking,
+-    ...parsed.passthrough
++    "--no-extensions",
++    "--no-skills",
++    "--no-prompt-templates",
++    "--no-themes",
++    "--extension", EXTENSION_PATH
+   ];
++  for (const extension of resources.extensions) piArgs.push("--extension", extension);
++  for (const skill of resources.skills) piArgs.push("--skill", skill);
++  for (const prompt of resources.prompts) piArgs.push("--prompt-template", prompt);
++  for (const theme of resources.themes) piArgs.push("--theme", theme);
++  piArgs.push(...parsed.passthrough);
++
+   const childEnv = {
+     ...env,
++    PI_CODING_AGENT_DIR: agentDir,
++    PI_CODING_AGENT_SESSION_DIR: getCascadeSessionDir(env),
++    PI_TELEMETRY: env.PI_TELEMETRY ?? "0",
++    AI_AGENT: "cascade",
+     CASCADE_PACKAGE_ROOT: PACKAGE_ROOT,
+     CASCADE_EXTENSION_PATH: EXTENSION_PATH,
+-    CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0"
++    CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",
++    ...(startupWarning ? { CASCADE_STARTUP_WARNING: startupWarning } : {})
+   };
+   if (parsed.explicitConfig) childEnv.CASCADE_CONFIG = resolve(parsed.explicitConfig);
+ 
+@@ -198,7 +239,7 @@ function parseCommandFlags(args) {
+     const arg = args[i];
+     if (!arg.startsWith("--")) { result.positional.push(arg); continue; }
+     const key = arg.slice(2);
+-    if (["force", "global", "approve", "expert-reviewed", "no-isolation"].includes(key)) result[key] = true;
++    if (["force", "global", "approve", "expert-reviewed", "no-isolation", "dry-run"].includes(key)) result[key] = true;
+     else {
+       result[key] = takeValue(args, i, arg);
+       i += 1;
+@@ -342,17 +383,76 @@ async function evalCommand(args) {
+   if (report.accepted !== report.taskCount) process.exitCode = 1;
+ }
+ 
++function parseBooleanFlag(value, name) {
++  if (value === undefined) return undefined;
++  const normalized = String(value).trim().toLowerCase();
++  if (["1", "true", "yes", "on"].includes(normalized)) return true;
++  if (["0", "false", "no", "off"].includes(normalized)) return false;
++  throw new Error(`${name} must be true or false`);
++}
++
++function compactionCommand(args) {
++  const flags = parseCommandFlags(args);
++  const [action = "show"] = flags.positional;
++  if (action === "show") {
++    console.log(JSON.stringify(getCascadeGlobalCompaction(), null, 2));
++    return;
++  }
++  if (action !== "set") throw new Error("Usage: cascade compaction show|set [options]");
++  const patch = {};
++  if (flags.enabled !== undefined) patch.enabled = parseBooleanFlag(flags.enabled, "--enabled");
++  if (flags["reserve-tokens"] !== undefined) patch.reserveTokens = Number(flags["reserve-tokens"]);
++  if (flags["keep-recent-tokens"] !== undefined) patch.keepRecentTokens = Number(flags["keep-recent-tokens"]);
++  const result = writeCascadeGlobalCompaction(patch);
++  console.log(JSON.stringify(result, null, 2));
++}
++
++async function updateCommand(args) {
++  const flags = parseCommandFlags(args);
++  const result = await runSelfUpdate({
++    dryRun: Boolean(flags["dry-run"]),
++    force: Boolean(flags.force),
++    source: flags.source,
++    currentVersion: PACKAGE_VERSION
++  });
++  if (result.dryRun) {
++    console.log(`${result.command} ${result.args.map((value) => JSON.stringify(value)).join(" ")}`);
++    return;
++  }
++  if (result.skipped) {
++    console.log(result.reason);
++    return;
++  }
++  console.log(`Cascade updated${result.remoteVersion ? ` to ${result.remoteVersion}` : ""}. Restart any running Cascade sessions.`);
++}
++
+ function runtimeCommand() {
+   const summary = runtimeSummary({ piBinary: "auto" });
+   console.log(JSON.stringify({ cascadeVersion: PACKAGE_VERSION, runtime: summary }, null, 2));
+   if (!summary.ok) process.exitCode = 1;
+ }
+ 
++function pathsCommand() {
++  const env = process.env;
++  const agentDir = ensureCascadeAgentLayout(env);
++  console.log(JSON.stringify({
++    home: getCascadeHome(env),
++    agentDir,
++    settings: getCascadeSettingsPath(env),
++    auth: getCascadeAuthPath(env),
++    sessions: getCascadeSessionDir(env),
++    globalConfig: getGlobalConfigPath(env),
++    projectConfig: getProjectConfigPath(process.cwd(), env)
++  }, null, 2));
++}
++
+ function selfTestCommand() {
+   const checks = [];
+   const add = (name, ok, detail = "") => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
+   add("Cascade package", existsSync(BIN_PATH), BIN_PATH);
+-  add("Cascade extension", existsSync(EXTENSION_PATH), EXTENSION_PATH);
++  add("Cascade application", existsSync(EXTENSION_PATH), EXTENSION_PATH);
++  const agentDir = ensureCascadeAgentLayout(process.env);
++  add("Isolated Cascade state", agentDir.includes(`${join(".cascade", "agent")}`) && !agentDir.includes(`${join(".pi", "agent")}`), agentDir);
+   const validation = validateConfig({ ...DEFAULT_CONFIG, ...createExampleConfig() });
+   add("Example configuration", validation.errors.length === 0, validation.errors.join("; ") || "valid");
+   const runtime = runtimeSummary({ piBinary: "auto" });
+@@ -378,7 +478,10 @@ async function main() {
+     return;
+   }
+   if (command === "runtime") return runtimeCommand();
++  if (command === "paths") return pathsCommand();
+   if (command === "self-test") return selfTestCommand();
++  if (command === "compaction") return compactionCommand(argv.slice(1));
++  if (command === "update" || command === "pull") return await updateCommand(argv.slice(1));
+   if (command === "init") return initCommand(argv.slice(1));
+   if (command === "doctor") return doctorCommand(argv.slice(1));
+   if (command === "config") return configCommand(argv.slice(1));
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 31f8624..d724629 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -1,86 +1,55 @@
+ # Architecture
+ 
+-## Three planes
++## Application boundary
+ 
+-```text
+-Immutable control plane
+-  privacy · credentials · hard budgets · protected paths · audit · rollback
+-
+-Task execution plane
+-  worker · expert subprocess · evidence ledger · adaptive router · verification
+-
+-Harness learning plane
+-  scoped candidates · replay metrics · canary · promotion · rollback · retirement
+-```
+-
+-## Standalone runtime delivery
+-
+-Cascade declares `@earendil-works/pi-coding-agent@0.84.2` as a normal runtime dependency and resolves its exported package location from inside the installed Cascade package. Parent sessions, expert subprocesses, probes, and diagnostics all launch that packaged runtime directly. A global `pi` command is neither discovered nor required unless the operator explicitly supplies `--pi-bin` as a development override.
+-
+-## Thin Pi integration
+-
+-Cascade uses Pi's supported extension surface for provider registration, model switching, lifecycle events, custom tools, commands, persistent session entries, project trust, and package loading. Pi's base agent loop and terminal UI remain upstream-owned.
+-
+-The wrapper performs the one operation an ordinary extension cannot perform before the first provider request: it selects the configured worker and injects the extension on process startup.
+-
+-## Workspace ownership
+-
+-The parent Pi session normally owns edits. Expert episodes are synchronous from the parent's perspective:
++Cascade is a standalone application that uses the Pi coding-agent package as an internal engine dependency. The `cascade` launcher establishes a separate application boundary before starting the engine:
+ 
+ ```text
+-parent pauses
+-  → checkpoint/evidence packet
+-  → isolated child Pi process
+-  → child exits
+-  → parent records outcome and resumes
++Cascade CLI
++  -> ~/.cascade/agent state and credentials
++  -> Cascade-only resource discovery
++  -> Cascade application TUI/header/footer
++  -> Pi agent loop and built-in coding tools
++  -> Cascade orchestration extension
+ ```
+ 
+-Consultation, review, and investigation are forced read-only. An explicitly authorized takeover may edit with the expert's configured tools. This maintains one active workspace owner.
++The launcher disables automatic Pi extension, skill, prompt, and theme discovery, then explicitly loads Cascade's application extension plus resources from `~/.cascade/agent` and trusted project `.cascade` directories. It never discovers `~/.pi` or project `.pi/extensions`.
+ 
+-## Expert process
++## Engine relationship
+ 
+-The child runs Pi's JSON event-stream mode with:
++`@earendil-works/pi-coding-agent@0.84.2` supplies the model runtime, agent loop, terminal primitives, sessions, compaction, provider adapters, and built-in coding tools. Cascade does not fork or vendor Pi source. The dependency and compatible upstream commit are pinned and attributed.
+ 
+-- exact provider and model;
+-- exact thinking level;
+-- bounded tool allowlist;
+-- compact evidence JSON;
+-- trust status;
+-- custom provider shim;
+-- timeout and output bounds.
++## Execution planes
+ 
+-Unavailable exact models fail closed. The runtime does not silently replace the expert with another provider/model.
++```text
++Control plane
++  isolated state · credentials · privacy · budgets · protected paths · update policy
+ 
+-## Evidence
++Task plane
++  worker · optional expert · evidence ledger · router · verification
+ 
+-The append-only ledger stores bounded, redacted records of:
++Harness-learning plane
++  scoped proposals · replay · canary · promotion · rollback
++```
+ 
+-- goals;
+-- tool calls and results;
+-- route signals;
+-- Git state;
+-- checkpoints;
+-- verifier results;
+-- model usage and estimated cost;
+-- expert episodes;
+-- harness changes.
++## Worker and expert
+ 
+-The handoff compiler progressively compacts data while preserving valid JSON and the most decision-relevant facts.
++The parent session is the only default workspace owner. A native worker follows Cascade's `/model` selection and inherits all active tools. A configured worker may pin a model. Explicit `restrictTools: true` is required before Cascade narrows the worker tool set.
+ 
+-## Routing
++Expert consultation, review, and investigation run in a bounded child process with a compact evidence packet and read-only tools. An explicit takeover may edit with the expert profile's configured tools. Exact model selection fails closed; there is no silent capability or privacy downgrade.
+ 
+-The router accumulates decaying trajectory signals rather than classifying the initial prompt. Signals include repeated errors, verifier failures, explicit uncertainty, stale progress, large diffs, broad file spread, and protected-path attempts.
++## Evidence and routing
+ 
+-Weights and thresholds are configuration. Model names and programming languages do not appear in routing branches. Expert admission also checks cooldown, call count, expert cost, and total session cost.
++The append-only ledger stores bounded and redacted goals, repository facts, tool outcomes, route signals, checkpoints, verifier results, usage, and expert episodes. Routing uses the observed trajectory rather than guessing task difficulty from the initial prompt.
+ 
+ ## Completion
+ 
+-When a repository diff changes, the previous completion proof becomes stale. Before settlement, the runtime may discover and run repository verification commands. Completion is blocked when required checks fail or remain unverified after the configured gate limit.
++Repository changes invalidate earlier verification. The completion gate discovers or uses configured checks, records the current diff identity, and requires successful evidence before completion when policy enables it.
+ 
+-## Harness learning
++## Compaction
+ 
+-Every trajectory records its harness manifest. Proposed prompt, memory, skill-description, or subagent-description edits remain inactive until evaluated. Process-local canaries cannot persist as promoted state by accident. Promotion writes versioned snapshots and supports rollback.
++Cascade uses the engine's structured compaction implementation but stores global limits in `~/.cascade/agent/settings.json`. The extension adds evidence and route state to compaction instructions so continuation state survives long sessions.
+ 
+-## Single mode
++## Updating
+ 
+-Single mode uses the same task plane and simply denies expert admission. There is no alternate legacy runtime.
++`cascade update` runs npm against the configured Git source without uninstalling the current package first. Application data is outside the npm installation and survives updates.
+diff --git a/docs/configuration.md b/docs/configuration.md
+index c6f600f..2f6b849 100644
+--- a/docs/configuration.md
++++ b/docs/configuration.md
+@@ -1,12 +1,29 @@
+ # Configuration reference
+ 
++For normal use, configure Cascade inside the TUI:
++
++```text
++/login openrouter
++/model
++/cascade-setup
++```
++
++The TUI can persist settings for the current session, the current project, or all Cascade projects. JSON is the automation and advanced-provider interface, not a startup requirement.
++
++Cascade keeps application state separate from Pi:
++
++- `~/.cascade/agent/settings.json`: engine and global compaction settings
++- `~/.cascade/agent/auth.json`: Cascade provider credentials
++- `~/.config/cascade/config.json`: global orchestration settings
++- `<repo>/.cascade/config.json`: trusted project orchestration settings
++
+ Configuration is merged in this order:
+ 
+-1. built-in defaults;
++1. built-in safe defaults;
+ 2. `~/.config/cascade/config.json`;
+ 3. trusted project `.cascade/config.json`;
+ 4. an explicit `--cascade-config` file;
+-5. environment and wrapper overrides.
++5. environment and CLI overrides.
+ 
+ Objects merge recursively. Arrays replace earlier arrays.
+ 
+@@ -15,7 +32,7 @@ Objects merge recursively. Arrays replace earlier arrays.
+ ```json
+ {
+   "schemaVersion": 1,
+-  "mode": "dual",
++  "mode": "single",
+   "piBinary": "auto",
+   "worker": {},
+   "expert": {},
+@@ -49,17 +66,24 @@ cascade self-test
+ 
+ ```json
+ {
++  "selectionMode": "configured",
++  "thinkingMode": "configured",
+   "provider": "openrouter",
+   "model": "vendor/model-id",
+   "thinking": "high",
+-  "tools": ["read", "grep", "find", "ls", "bash"],
++  "restrictTools": false,
++  "tools": ["read", "grep", "find", "ls", "bash", "edit", "write"],
+   "instructions": "Profile-specific instructions",
+   "timeoutMs": 600000,
+   "maxOutputCharacters": 120000
+ }
+ ```
+ 
+-`provider`, `model`, `thinking`, `tools`, and `instructions` are supported for both roles. `timeoutMs` and `maxOutputCharacters` govern isolated expert episodes.
++`selectionMode: "native"` makes the worker follow the model selected in Cascade's `/model` interface. `selectionMode: "configured"` pins the profile to `provider` and `model`. `thinkingMode` behaves the same way for thinking level.
++
++`restrictTools` defaults to `false`. In that mode Cascade inherits the engine's entire active tool set, including Cascade-only extension tools. The `tools` array becomes an allowlist only when `restrictTools` is explicitly true.
++
++`timeoutMs` and `maxOutputCharacters` govern isolated expert episodes.
+ 
+ Valid thinking levels follow Pi: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Pi clamps unsupported levels to model capability.
+ 
+@@ -187,7 +211,7 @@ Valid classifications are `public`, `internal`, `confidential`, `regulated`, and
+ }
+ ```
+ 
+-Persistent evidence lives under `~/.local/state/cascade/sessions/` unless `CASCADE_STATE_DIR` is set.
++Persistent orchestration evidence lives under `~/.local/state/cascade/sessions/` unless `CASCADE_STATE_DIR` is set. Engine sessions live separately under `~/.cascade/agent/sessions/`.
+ 
+ ## Verification
+ 
+@@ -288,3 +312,25 @@ A sandbox command is an argument array and may contain `{python}`, `{script}`, a
+ | `CASCADE_STATE_DIR` | Root for Cascade runtime state |
+ 
+ Wrapper flags map to these variables for one process. The JSON file remains the authoritative way to configure every nested policy field.
++
++
++## Global compaction
++
++Global Cascade compaction settings are stored in `~/.cascade/agent/settings.json`:
++
++```json
++{
++  "quietStartup": true,
++  "compaction": {
++    "enabled": true,
++    "reserveTokens": 16384,
++    "keepRecentTokens": 20000
++  }
++}
++```
++
++Use `cascade compaction show`, `cascade compaction set`, or `/cascade-compaction` rather than editing the file directly.
++
++## Updates
++
++`cascade update` and `cascade pull` reinstall the configured Git/npm source into the current global npm prefix. Override the source with `--source` or `CASCADE_UPDATE_SOURCE` when testing a controlled branch or release.
+diff --git a/docs/known-limitations.md b/docs/known-limitations.md
+index 45bfcdf..52210b2 100644
+--- a/docs/known-limitations.md
++++ b/docs/known-limitations.md
+@@ -1,12 +1,10 @@
+ # Known limitations
+ 
+-- Cascade is a thin Pi extension and package overlay, not a replacement agent runtime.
+-- Live model availability, pricing, rate limits, and API compatibility are account- and date-dependent. Use `cascade probe`.
+-- The bundled Meta profile is based on public OpenAI-compatible Model API integration information; an account may require a different current model ID or adapter.
+-- Contributor redaction and path denial are defense in depth, not a proof that proprietary information cannot be inferred from ordinary source text.
+-- Pi and Pi extensions execute with the launching user's permissions unless the entire process or tool surface is externally sandboxed.
+-- Expert cost estimates depend on provider usage/cost reporting or configured catalog rates.
+-- Automatic routing begins with a transparent weighted policy. It records trajectory data but does not ship a pretrained proprietary routing model.
+-- Harness promotion evaluates observed tasks, not every possible future repository. Global changes therefore require stricter review.
+-- The programmatic workspace is a bounded subprocess helper, not a security sandbox or a persistent IPython kernel.
+-- The distributed source package includes the full Cascade implementation and deterministic Pi overlay/bootstrap scripts. It does not redistribute Pi's entire upstream monorepo inside the npm tarball.
++- Cascade uses Pi's engine and terminal component library internally. It is a separate application boundary, not an independently reimplemented agent engine.
++- Provider availability, model IDs, prices, limits, and terms change independently of Cascade. Use `/login`, `/model`, and `cascade probe` with your own account.
++- Cascade extensions run with the launching user's operating-system permissions. Use an external sandbox for untrusted repositories or commands.
++- Secret redaction and denied paths are defense in depth; ordinary source text can still disclose proprietary information.
++- The initial router is a transparent trajectory-scoring policy. Repository-local outcome learning requires real usage data and does not guarantee optimal model allocation.
++- Global compaction limits expose the engine's `reserveTokens` and `keepRecentTokens` controls. They do not create a hard provider-side context cap.
++- `cascade update` depends on npm, Git, network access, and write permission to the active global npm prefix.
++- Project `AGENTS.md` files remain visible because they are repository instructions. Pi-specific global state and `.pi/extensions` are isolated.
+diff --git a/docs/legal.md b/docs/legal.md
+index 2a05320..a3eaf28 100644
+--- a/docs/legal.md
++++ b/docs/legal.md
+@@ -4,11 +4,11 @@ Cascade is released under the MIT License. The full license is in [`LICENSE`](..
+ 
+ ## Relationship to Pi
+ 
+-Cascade is an independent extension and wrapper around the published `@earendil-works/pi-coding-agent` package. It is not an official Pi distribution and is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works.
++Cascade is an independent application built on the published `@earendil-works/pi-coding-agent` package as an internal engine dependency. It is not an official Pi distribution and is not affiliated with, sponsored by, or endorsed by the Pi project, Mario Zechner, or Earendil Works.
+ 
+ The repository does **not** vendor the Pi source tree. The package declares an exact runtime dependency on `@earendil-works/pi-coding-agent@0.84.2`; npm downloads that dependency separately when Cascade is installed. Pi remains under its own MIT License. A copy is preserved at [`licenses/PI-LICENSE.txt`](../licenses/PI-LICENSE.txt), and attribution is recorded in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
+ 
+-The integration uses Pi's published CLI and public extension APIs. `UPSTREAM.json` records the compatible upstream commit and package version.
++The integration uses Pi's published package APIs, engine CLI, terminal primitives, and extension APIs behind an isolated Cascade application boundary. `UPSTREAM.json` records the compatible upstream commit and package version.
+ 
+ ## Distribution
+ 
+diff --git a/docs/privacy.md b/docs/privacy.md
+index 9455c31..0b36519 100644
+--- a/docs/privacy.md
++++ b/docs/privacy.md
+@@ -1,16 +1,32 @@
+ # Privacy and trust
+ 
++## Application isolation
++
++Cascade sets the engine directory to `~/.cascade/agent` and disables automatic Pi resource discovery. It does not read or execute:
++
++- `~/.pi/agent/AGENTS.md`;
++- `~/.pi/agent/auth.json`;
++- `~/.pi/agent/extensions`;
++- project `.pi/extensions`;
++- Pi sessions or Pi settings.
++
++Cascade discovers global extensions, skills, prompts, and themes only under `~/.cascade/agent`. Trusted project resources live under `.cascade`.
++
++Repository `AGENTS.md` files remain available because they are project instructions, not Pi application state.
++
++## Credentials
++
++Native `/login` inside Cascade writes credentials to `~/.cascade/agent/auth.json`. Environment variables remain process-level inputs and are therefore shared if the user exports them in the shell. Secrets should not be written into project configuration.
++
+ ## Contributor endpoints
+ 
+-Cascade treats a model identifier matching `privacy.contributorPattern` as a distinct data-use class. The endpoint is blocked unless the repository is classified `public` and `privacy.allowContributor` is explicitly true.
++A model identifier matching `privacy.contributorPattern` is treated as a distinct data-use class. It is blocked unless the repository is classified `public` and `privacy.allowContributor` is explicitly true.
+ 
+-No fallback may cross from a private endpoint to Contributor unless that endpoint is independently configured and admitted by the same policy.
++A stale Contributor profile never blocks application startup. Policy is evaluated when Cascade actually selects or invokes that profile.
+ 
+ ## Denied paths and tool calls
+ 
+-While a Contributor model is active, Cascade inspects built-in `read`, `edit`, `write`, `grep`, `find`, `ls`, and suspicious `bash` calls against `privacy.denyPaths`. Common credential locations are denied by default. Images are blocked unless explicitly enabled.
+-
+-The policy applies both to the parent worker and to isolated expert episodes.
++While a Contributor model is active, Cascade inspects built-in file/search tools and suspicious shell calls against `privacy.denyPaths`. Common credential locations are denied by default. Images are blocked unless explicitly enabled.
+ 
+ ## Evidence redaction
+ 
+@@ -18,12 +34,10 @@ Evidence handoffs redact common key, token, authorization, password, and secret
+ 
+ Redaction is defense in depth. Arbitrary source text may still contain identifying or proprietary information that does not resemble a credential.
+ 
+-## Trust boundary
+-
+-Pi extensions and generated commands execute with the user's operating-system permissions. Cascade's privacy policy controls admission and selected built-in tools; it does not create kernel-level filesystem, process, network, or credential isolation.
++## Operating-system boundary
+ 
+-Use an external container, micro-VM, or policy sandbox for untrusted repositories or generated code. The optional programmatic workspace has its own explicit sandbox requirement, but the rest of Pi must also be isolated when stronger boundaries are needed.
++Cascade and its extensions execute with the launching user's permissions. Use a container, micro-VM, or policy sandbox for untrusted repositories or generated commands.
+ 
+ ## Project trust
+ 
+-Project `.cascade/config.json`, project extensions, and project skills should be loaded only after Pi trusts the project. The wrapper recognizes `--approve` and passes it through to Pi. Non-interactive automation should set project trust deliberately rather than relying on an interactive prompt.
++Project `.cascade/config.json`, extensions, skills, prompts, and themes are loaded only when the project is trusted. `cascade --approve` intentionally enables those project-local resources.
+diff --git a/docs/testing.md b/docs/testing.md
+index a93984c..a92699f 100644
+--- a/docs/testing.md
++++ b/docs/testing.md
+@@ -1,58 +1,52 @@
+ # Testing
+ 
+-## Automated local suite
+-
+-Run:
++## Full local suite
+ 
+ ```bash
+-npm test
+-npm run check
+-npm run smoke
++npm ci --ignore-scripts
++npm run ci
+ ```
+ 
+ The suite covers:
+ 
+-- configuration precedence and project trust;
+-- full worker/expert profile overrides;
+-- one-model collapse;
+-- provider registration and exact model selection;
+-- isolated expert JSON-stream parsing;
+-- read-only consultation and editable takeover tool policies;
+-- append-only evidence persistence and session recovery;
+-- route escalation, decay, cooldown, and budget admission;
+-- Contributor consent, secret redaction, image denial, and protected paths;
+-- real temporary Git repositories and completion verification;
+-- harness proposals, canaries, replay metrics, promotion, rollback, and non-persistence of canaries;
+-- optional workspace sandbox refusal and bounded state persistence;
+-- package overlay installation;
+-- npm package creation, local installation, and isolated global installation with no pre-existing `pi` executable.
++- configuration precedence, migration, and project trust;
++- isolated `~/.cascade` state, auth, sessions, settings, and resource discovery;
++- proof that fake `~/.pi` context and extensions are neither displayed nor executed;
++- a real pseudo-terminal Cascade launch with custom header/footer and native commands;
++- a real no-key agent loop using the engine's built-in `write` tool and a second post-tool model turn;
++- native worker model selection and unrestricted tool inheritance;
++- configured worker/expert overrides and reversible explicit tool restrictions;
++- expert consultation, read-only investigation, and explicit takeover;
++- evidence, routing, budgets, privacy, verification, persistence, and harness replay;
++- global compaction settings and self-update planning;
++- npm tarball, global-prefix, and Git-source installations without a separate Pi install.
++
++## Real terminal isolation test
++
++The pseudo-terminal test creates two fake application homes:
++
++```text
++~/.pi/agent/extensions/pi-only-sentinel.mjs
++~/.cascade/agent/extensions/cascade-only-sentinel.mjs
++```
++
++It launches the actual `cascade` terminal process and proves that only the Cascade extension executes. It also verifies the Cascade brand, absence of Pi's startup header, absence of Pi global context, and a responsive `/cascade` command.
+ 
+-A protocol-faithful local npm registry supplies a package with the exact official Pi package name, version, exports, and CLI layout during offline release smoke tests. The final Cascade tarball is installed by itself, proving npm resolves the runtime as its dependency rather than relying on a pre-existing global `pi` command. Protocol-faithful fake Pi executables are also used for focused child-process tests. Repository verification tests use actual Git and actual subprocess commands.
++## Real no-key agent/tool test
+ 
+-## What local tests do not prove
++A keyless local provider drives the actual `createAgentSession` engine. The first model turn requests the real built-in `write` tool. The engine writes a file, returns the tool result, performs a second model turn, and settles. This test does not use network access or user credentials.
+ 
+-The build environment has no provider credentials and no direct network access. Therefore the local suite does not claim that a particular OpenRouter route or Meta catalog entry is currently enabled for your account.
++## Live providers
+ 
+-Run the live probes after configuring credentials:
++The automated suite deliberately does not use user API keys. Provider-account validation remains explicit:
+ 
+ ```bash
+-cascade doctor --approve
+ cascade probe worker --approve
+ cascade probe expert --approve
+ ```
+ 
+-A probe verifies authentication, exact model selection, streaming completion, tool execution, usage reporting, and Pi's provider adapter path. It consumes a small amount of provider quota.
+-
+-## Evaluation manifests
+-
+-`cascade eval` executes each task in Pi JSON mode and then runs deterministic checks.
+-
+-```bash
+-cascade eval examples/eval-manifest.json --output eval-report.json
+-```
+-
+-Harness replay executes the same manifest under baseline and canary harness states. Isolation is enabled by default. `--no-isolation` is available for controlled disposable workspaces and may contaminate state between runs.
++A probe may consume a small amount of provider quota.
+ 
+-## Release evidence
++## Cross-platform CI
+ 
+-`TEST_REPORT.md` records the exact commands, runtime, counts, and limitations for the distributed archive.
++GitHub Actions runs the suite on Linux, macOS, Windows, Node 22.19, and Node 24. It also installs the exact Git commit into a clean prefix and runs `cascade --version`, `cascade self-test`, `cascade paths`, and update/compaction smoke checks. CodeQL runs separately.
+diff --git a/examples/cascade.json b/examples/cascade.json
+index f638077..1809cf8 100644
+--- a/examples/cascade.json
++++ b/examples/cascade.json
+@@ -2,41 +2,26 @@
+   "schemaVersion": 1,
+   "mode": "dual",
+   "worker": {
+-    "provider": "meta-model-api",
+-    "model": "muse-spark-1.2-contributor",
+-    "thinking": "medium",
+-    "tools": [
+-      "read",
+-      "grep",
+-      "find",
+-      "ls",
+-      "bash",
+-      "edit",
+-      "write"
+-    ],
+-    "instructions": ""
++    "selectionMode": "native",
++    "thinkingMode": "native",
++    "restrictTools": false
+   },
+   "expert": {
++    "selectionMode": "configured",
++    "thinkingMode": "configured",
+     "provider": "openrouter",
+     "model": "openrouter/auto",
+     "thinking": "high",
+-    "tools": [
+-      "read",
+-      "grep",
+-      "find",
+-      "ls",
+-      "bash"
+-    ],
++    "restrictTools": false,
+     "timeoutMs": 600000,
+-    "maxOutputCharacters": 120000,
+-    "instructions": ""
++    "maxOutputCharacters": 120000
+   },
+   "privacy": {
+     "classification": "unknown",
+     "allowContributor": false
+   },
+   "routing": {
+-    "autoConsult": true
++    "autoConsult": false
+   },
+   "harnessLearning": {
+     "mode": "observe",
+diff --git a/extension/core/config.mjs b/extension/core/config.mjs
+index 4f531dd..e5b0733 100644
+--- a/extension/core/config.mjs
++++ b/extension/core/config.mjs
+@@ -6,6 +6,7 @@ import {
+   DEFAULT_CONFIG,
+   VALID_HARNESS_MODES,
+   VALID_MODES,
++  VALID_SELECTION_MODES,
+   VALID_THINKING_LEVELS
+ } from "./defaults.mjs";
+ import {
+@@ -18,7 +19,8 @@ import {
+ 
+ export function getGlobalConfigPath(env = process.env) {
+   if (env.CASCADE_CONFIG_GLOBAL) return resolve(env.CASCADE_CONFIG_GLOBAL);
+-  const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(homedir(), ".config");
++  const home = env.HOME ? resolve(env.HOME) : homedir();
++  const configHome = env.XDG_CONFIG_HOME ? resolve(env.XDG_CONFIG_HOME) : join(home, ".config");
+   return join(configHome, "cascade", "config.json");
+ }
+ 
+@@ -72,23 +74,23 @@ export function environmentOverrides(env = process.env) {
+   if (env.CASCADE_PI_BIN) result.piBinary = env.CASCADE_PI_BIN;
+ 
+   const worker = parseModelReference(env.CASCADE_WORKER || "");
+-  if (worker) result.worker = worker;
++  if (worker) result.worker = { ...worker, selectionMode: "configured", thinkingMode: "configured" };
+   if (env.CASCADE_WORKER_THINKING) {
+     result.worker = { ...(result.worker || {}), thinking: env.CASCADE_WORKER_THINKING };
+   }
+   if (env.CASCADE_WORKER_TOOLS !== undefined) {
+-    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS) };
++    result.worker = { ...(result.worker || {}), tools: parseListEnvironment(env.CASCADE_WORKER_TOOLS), restrictTools: true };
+   }
+   if (env.CASCADE_WORKER_INSTRUCTIONS !== undefined) {
+     result.worker = { ...(result.worker || {}), instructions: String(env.CASCADE_WORKER_INSTRUCTIONS) };
+   }
+   const expert = parseModelReference(env.CASCADE_EXPERT || "");
+-  if (expert) result.expert = expert;
++  if (expert) result.expert = { ...expert, selectionMode: "configured", thinkingMode: "configured" };
+   if (env.CASCADE_EXPERT_THINKING) {
+     result.expert = { ...(result.expert || {}), thinking: env.CASCADE_EXPERT_THINKING };
+   }
+   if (env.CASCADE_EXPERT_TOOLS !== undefined) {
+-    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS) };
++    result.expert = { ...(result.expert || {}), tools: parseListEnvironment(env.CASCADE_EXPERT_TOOLS), restrictTools: true };
+   }
+   if (env.CASCADE_EXPERT_INSTRUCTIONS !== undefined) {
+     result.expert = { ...(result.expert || {}), instructions: String(env.CASCADE_EXPERT_INSTRUCTIONS) };
+@@ -158,8 +160,18 @@ function validateModelConfig(model, label, errors) {
+     errors.push(`${label} must be an object`);
+     return;
+   }
+-  if (typeof model.provider !== "string" || !model.provider.trim()) errors.push(`${label}.provider is required`);
+-  if (typeof model.model !== "string" || !model.model.trim()) errors.push(`${label}.model is required`);
++  const selectionMode = model.selectionMode || (label === "worker" ? "native" : "configured");
++  if (!VALID_SELECTION_MODES.has(selectionMode)) errors.push(`${label}.selectionMode must be native or configured`);
++  if (selectionMode === "configured") {
++    if (typeof model.provider !== "string" || !model.provider.trim()) errors.push(`${label}.provider is required`);
++    if (typeof model.model !== "string" || !model.model.trim()) errors.push(`${label}.model is required`);
++  }
++  if (model.thinkingMode !== undefined && !VALID_SELECTION_MODES.has(model.thinkingMode)) {
++    errors.push(`${label}.thinkingMode must be native or configured`);
++  }
++  if (model.restrictTools !== undefined && typeof model.restrictTools !== "boolean") {
++    errors.push(`${label}.restrictTools must be boolean`);
++  }
+   if (model.thinking !== undefined && !VALID_THINKING_LEVELS.has(model.thinking)) {
+     errors.push(`${label}.thinking must be one of ${[...VALID_THINKING_LEVELS].join(", ")}`);
+   }
+@@ -228,7 +240,13 @@ export function validateConfig(config) {
+ 
+ export function normalizeConfig(config) {
+   const normalized = deepClone(config);
++  normalized.worker.selectionMode = normalized.worker.selectionMode || "native";
++  normalized.worker.thinkingMode = normalized.worker.thinkingMode || (normalized.worker.selectionMode === "configured" ? "configured" : "native");
++  normalized.worker.restrictTools = normalized.worker.restrictTools === true;
+   normalized.worker.tools = normalizeStringArray(normalized.worker.tools, DEFAULT_CONFIG.worker.tools);
++  normalized.expert.selectionMode = normalized.expert.selectionMode || "configured";
++  normalized.expert.thinkingMode = normalized.expert.thinkingMode || "configured";
++  normalized.expert.restrictTools = normalized.expert.restrictTools === true;
+   normalized.expert.tools = normalizeStringArray(normalized.expert.tools, DEFAULT_CONFIG.expert.tools);
+   normalized.privacy.denyPaths = normalizeStringArray(normalized.privacy.denyPaths, DEFAULT_CONFIG.privacy.denyPaths);
+   normalized.routing.failureCommands = normalizeStringArray(
+@@ -295,33 +313,32 @@ export function loadEffectiveConfig({
+ export function createExampleConfig() {
+   return {
+     schemaVersion: 1,
+-    mode: "dual",
++    mode: "single",
+     worker: {
+-      provider: "meta-model-api",
+-      model: "muse-spark-1.2-contributor",
++      selectionMode: "native",
++      thinkingMode: "native",
++      restrictTools: false,
++      provider: "openrouter",
++      model: "openrouter/auto",
+       thinking: "medium",
+       tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
+       instructions: ""
+     },
+     expert: {
++      selectionMode: "configured",
++      thinkingMode: "configured",
++      restrictTools: false,
+       provider: "openrouter",
+       model: "openrouter/auto",
+       thinking: "high",
+-      tools: ["read", "grep", "find", "ls", "bash"],
++      tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
+       timeoutMs: 600000,
+       maxOutputCharacters: 120000,
+       instructions: ""
+     },
+-    privacy: {
+-      classification: "unknown",
+-      allowContributor: false
+-    },
+-    routing: {
+-      autoConsult: true
+-    },
+-    harnessLearning: {
+-      mode: "observe"
+-    },
++    privacy: { classification: "unknown", allowContributor: false },
++    routing: { autoConsult: false },
++    harnessLearning: { mode: "observe" },
+     workspaceRuntime: {
+       enabled: false,
+       pythonBinary: "python3",
+diff --git a/extension/core/defaults.mjs b/extension/core/defaults.mjs
+index 89f2464..5575c83 100644
+--- a/extension/core/defaults.mjs
++++ b/extension/core/defaults.mjs
+@@ -1,22 +1,28 @@
+-export const PACKAGE_VERSION = "0.2.0";
++export const PACKAGE_VERSION = "0.4.0";
+ export const CONFIG_SCHEMA_VERSION = 1;
+ 
+ export const DEFAULT_CONFIG = Object.freeze({
+   schemaVersion: CONFIG_SCHEMA_VERSION,
+-  mode: "dual",
++  mode: "single",
+   piBinary: "auto",
+   worker: {
+-    provider: "meta-model-api",
+-    model: "muse-spark-1.2-contributor",
++    selectionMode: "native",
++    thinkingMode: "native",
++    restrictTools: false,
++    provider: "openrouter",
++    model: "openrouter/auto",
+     thinking: "medium",
+     tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
+     instructions: ""
+   },
+   expert: {
++    selectionMode: "configured",
++    thinkingMode: "configured",
++    restrictTools: false,
+     provider: "openrouter",
+     model: "openrouter/auto",
+     thinking: "high",
+-    tools: ["read", "grep", "find", "ls", "bash"],
++    tools: ["read", "grep", "find", "ls", "bash", "edit", "write"],
+     timeoutMs: 600000,
+     maxOutputCharacters: 120000,
+     instructions: ""
+@@ -53,7 +59,7 @@ export const DEFAULT_CONFIG = Object.freeze({
+   },
+   routing: {
+     enabled: true,
+-    autoConsult: true,
++    autoConsult: false,
+     allowModelInitiatedTakeover: false,
+     injectRecommendation: true,
+     cooldownTurns: 2,
+@@ -165,6 +171,7 @@ export const DEFAULT_CONFIG = Object.freeze({
+     statePath: ""
+   },
+   ui: {
++    showHeader: true,
+     showStatus: true,
+     verboseNotifications: false
+   }
+@@ -172,6 +179,7 @@ export const DEFAULT_CONFIG = Object.freeze({
+ 
+ export const CONTRIBUTOR_CLASSIFICATIONS_ALLOWED_BY_DEFAULT = new Set(["public"]);
+ export const VALID_MODES = new Set(["single", "dual"]);
++export const VALID_SELECTION_MODES = new Set(["native", "configured"]);
+ export const VALID_THINKING_LEVELS = new Set([
+   "off",
+   "minimal",
+diff --git a/extension/core/doctor.mjs b/extension/core/doctor.mjs
+index 0274ea5..cb3105b 100644
+--- a/extension/core/doctor.mjs
++++ b/extension/core/doctor.mjs
+@@ -51,8 +51,12 @@ export function runDoctor({ config, cwd, packageRoot, validation, sources = [] }
+   add("Configuration", validation.errors.length === 0, validation.errors.length ? validation.errors.join("; ") : "valid");
+   for (const warning of validation.warnings) add("Configuration warning", true, warning, "warning");
+ 
+-  const workerPolicy = evaluateContributorPolicy(config, config.worker);
+-  add("Worker data policy", workerPolicy.allowed, workerPolicy.reason);
++  if (config.worker?.selectionMode === "configured") {
++    const workerPolicy = evaluateContributorPolicy(config, config.worker);
++    add("Worker data policy", workerPolicy.allowed, workerPolicy.reason);
++  } else {
++    add("Worker data policy", true, "native TUI model; policy is evaluated when a model is selected", "info");
++  }
+   if (config.mode === "dual") {
+     const expertPolicy = evaluateContributorPolicy(config, config.expert);
+     add("Expert data policy", expertPolicy.allowed, expertPolicy.reason);
+diff --git a/extension/core/expert-runner.mjs b/extension/core/expert-runner.mjs
+index d67be82..3793af2 100644
+--- a/extension/core/expert-runner.mjs
++++ b/extension/core/expert-runner.mjs
+@@ -6,6 +6,7 @@ import { redactSecrets } from "./privacy.mjs";
+ import { truncateText } from "./util.mjs";
+ import { providerCostFor } from "./providers.mjs";
+ import { spawnPi } from "./pi-runtime.mjs";
++import { getCascadeAgentDir, getCascadeSessionDir } from "./cascade-paths.mjs";
+ 
+ export function composeExpertPrompt({ mode, question, evidenceJson, instructions = "" }) {
+   const access = mode === "consult"
+@@ -84,6 +85,8 @@ export async function runExpertEpisode({
+         cwd,
+         env: {
+           ...process.env,
++          PI_CODING_AGENT_DIR: getCascadeAgentDir(),
++          PI_CODING_AGENT_SESSION_DIR: getCascadeSessionDir(),
+           CASCADE_CHILD: "1",
+           CASCADE_CONFIG: configPath,
+           CASCADE_PROJECT_TRUSTED: projectTrusted ? "1" : "0",
+diff --git a/extension/core/probe.mjs b/extension/core/probe.mjs
+index c3b7d34..93cdcd9 100644
+--- a/extension/core/probe.mjs
++++ b/extension/core/probe.mjs
+@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { truncateText } from "./util.mjs";
+ import { spawnPi } from "./pi-runtime.mjs";
++import { getCascadeAgentDir, getCascadeSessionDir } from "./cascade-paths.mjs";
+ 
+ export async function probeModelProfile({ config, profile, cwd, extensionPath, probeExtensionPath, timeoutMs = 120000 }) {
+   const temporaryDirectory = mkdtempSync(join(tmpdir(), "cascade-probe-"));
+@@ -37,6 +38,8 @@ export async function probeModelProfile({ config, profile, cwd, extensionPath, p
+       cwd,
+       env: {
+         ...process.env,
++        PI_CODING_AGENT_DIR: getCascadeAgentDir(),
++        PI_CODING_AGENT_SESSION_DIR: getCascadeSessionDir(),
+         CASCADE_CHILD: "1",
+         CASCADE_CONFIG: configPath,
+         AI_AGENT: "cascade-probe"
+diff --git a/extension/index.mjs b/extension/index.mjs
+index 7eb4a9d..ddd0437 100644
+--- a/extension/index.mjs
++++ b/extension/index.mjs
+@@ -24,6 +24,9 @@ import {
+ } from "./core/verification.mjs";
+ import { runProgrammaticWorkspace } from "./core/workspace.mjs";
+ import { modelReference, parseModelReference, shortHash, truncateText } from "./core/util.mjs";
++import { applyRoleToolPolicy, createToolPolicyState, modelId, sameModel, usesConfiguredModel } from "./core/pi-parity.mjs";
++import { chooseLoginProvider, prepareNativeLogin, runCascadeSetup, runCompactionSetup, runRoleModelPicker } from "./core/tui-setup.mjs";
++import { getCascadeGlobalCompaction } from "./core/pi-settings.mjs";
+ 
+ const EXTENSION_PATH = fileURLToPath(import.meta.url);
+ const PACKAGE_ROOT = dirname(dirname(EXTENSION_PATH));
+@@ -114,18 +117,16 @@ function activeModelConfig(ctx, config, currentRole) {
+   const provider = ctx.model?.provider;
+   const id = ctx.model?.id || ctx.model?.model || ctx.model?.modelId;
+   if (provider && id) return { provider, model: id };
++  if (currentRole === "worker" && !usesConfiguredModel(config.worker)) return { provider: "native", model: "unselected" };
+   return currentRole === "expert" ? config.expert : config.worker;
+ }
+ 
+-function formatStatus({ config, ledger, router, currentRole, blockedReason, harness }) {
++function formatStatus({ config, ledger, router, currentRole, blockedReason }) {
+   const totals = ledger?.totals() || { expertCalls: 0, estimatedTotalCostUsd: 0 };
+   const route = router?.snapshot() || { level: "worker", score: 0 };
+-  const data = isContributorModel(currentRole === "expert" ? config.expert : config.worker, config.privacy.contributorPattern)
+-    ? "CONTRIBUTOR"
+-    : "PRIVATE";
+-  const harnessHash = harness?.manifest().combinedHash?.slice(0, 6) || "none";
+-  if (blockedReason) return `cascade:BLOCKED ${truncateText(blockedReason, 40)}`;
+-  return `cascade:${config.mode}/${currentRole} route:${route.level}:${route.score.toFixed?.(1) ?? route.score} expert:${totals.expertCalls} $${Number(totals.estimatedTotalCostUsd || 0).toFixed(3)} data:${data} h:${harnessHash}`;
++  if (blockedReason) return `Cascade · attention: ${truncateText(blockedReason, 54)}`;
++  const expert = config.mode === "dual" ? ` · expert ${totals.expertCalls}` : "";
++  return `${currentRole} · ${config.mode} · route ${route.level}${expert} · $${Number(totals.estimatedTotalCostUsd || 0).toFixed(3)}`;
+ }
+ 
+ function buildSystemAppendix({ config, router, harness, currentRole, contributorPolicy }) {
+@@ -199,6 +200,30 @@ export default function cascadeExtension(pi) {
+   let lastGateDiffKey = "";
+   let completionGateRuns = 0;
+   let completionGateInFlight = false;
++  let workerRuntimeModel;
++  let workerRuntimeThinking;
++  let roleSwitchInProgress = false;
++  const toolPolicyState = createToolPolicyState();
++
++  function captureWorkerRuntime(ctx) {
++    if (!ctx?.model) return;
++    workerRuntimeModel = ctx.model;
++    workerRuntimeThinking = ctx.thinkingLevel;
++    config.worker = { ...config.worker, provider: ctx.model.provider, model: modelId(ctx.model) };
++  }
++
++  function cascadeControlTools(role) {
++    const controls = CONTROL_TOOLS.filter((name) => {
++      if (name === "cascade_expert" && config.mode !== "dual") return false;
++      return role === "worker" || name !== "cascade_expert";
++    });
++    if (config.workspaceRuntime?.enabled) controls.push("cascade_workspace");
++    return controls;
++  }
++
++  function applyTools(role, profile) {
++    return applyRoleToolPolicy({ pi, profile, controls: cascadeControlTools(role), state: toolPolicyState });
++  }
+ 
+   function loadConfig(cwd, projectTrusted) {
+     const result = loadEffectiveConfig({
+@@ -212,18 +237,23 @@ export default function cascadeExtension(pi) {
+     if (flagMode === "single" || flagMode === "dual") config.mode = flagMode;
+     const workerFlag = pi.getFlag?.("cascade-worker");
+     const workerRef = parseModelReference(typeof workerFlag === "string" ? workerFlag : "");
+-    if (workerRef?.provider && workerRef?.model) config.worker = { ...config.worker, ...workerRef };
++    if (workerRef?.provider && workerRef?.model) {
++      config.worker = { ...config.worker, ...workerRef, selectionMode: "configured", thinkingMode: "configured" };
++    }
++    if (process.env.CASCADE_WORKER) config.worker.selectionMode = "configured";
+     const expertFlag = pi.getFlag?.("cascade-expert");
+     const expertRef = parseModelReference(typeof expertFlag === "string" ? expertFlag : "");
+-    if (expertRef?.provider && expertRef?.model) config.expert = { ...config.expert, ...expertRef };
++    if (expertRef?.provider && expertRef?.model) {
++      config.expert = { ...config.expert, ...expertRef, selectionMode: "configured", thinkingMode: "configured" };
++    }
+     const workerThinking = pi.getFlag?.("cascade-worker-thinking");
+     if (typeof workerThinking === "string" && workerThinking) config.worker.thinking = workerThinking;
+     const expertThinking = pi.getFlag?.("cascade-expert-thinking");
+     if (typeof expertThinking === "string" && expertThinking) config.expert.thinking = expertThinking;
+     const workerTools = parseToolList(pi.getFlag?.("cascade-worker-tools"));
+-    if (workerTools) config.worker.tools = workerTools;
++    if (workerTools) config.worker = { ...config.worker, tools: workerTools, restrictTools: true };
+     const expertTools = parseToolList(pi.getFlag?.("cascade-expert-tools"));
+-    if (expertTools) config.expert.tools = expertTools;
++    if (expertTools) config.expert = { ...config.expert, tools: expertTools, restrictTools: true };
+     const workerInstructions = pi.getFlag?.("cascade-worker-instructions");
+     if (typeof workerInstructions === "string") config.worker.instructions = workerInstructions;
+     const expertInstructions = pi.getFlag?.("cascade-expert-instructions");
+@@ -285,30 +315,47 @@ ${state.stagedStat || ""}`, 24),
+   async function activateRole(role, ctx, { quiet = false } = {}) {
+     const target = role === "expert" ? config.expert : config.worker;
+     if (role === "expert" && config.mode !== "dual") throw new Error("Expert role is unavailable in single-model mode");
+-    const policy = policyFor(target);
++    const policyTarget = role === "worker" && !usesConfiguredModel(target)
++      ? activeModelConfig(ctx, config, currentRole)
++      : target;
++    const policy = policyFor(policyTarget);
+     if (!policy.allowed) throw new Error(policy.reason);
+-    const model = findConfiguredModel(ctx, target);
+-    if (!model) throw new Error(`Configured ${role} model was not found: ${describeModel(target)}`);
+-    const changed = await pi.setModel(model);
+-    if (!changed) throw new Error(`No usable credentials for ${describeModel(target)}`);
+-    pi.setThinkingLevel(target.thinking);
+-    const available = new Set(pi.getAllTools().map((tool) => tool.name));
+-    const controls = CONTROL_TOOLS.filter((name) => {
+-      if (name === "cascade_expert" && config.mode !== "dual") return false;
+-      return role === "worker" || name !== "cascade_expert";
+-    });
+-    const optionalControls = config.workspaceRuntime?.enabled ? ["cascade_workspace"] : [];
+-    const desired = [...target.tools, ...controls, ...optionalControls];
+-    pi.setActiveTools([...new Set(desired)].filter((name) => available.has(name)));
++
++    roleSwitchInProgress = true;
++    try {
++      if (role === "worker" && !usesConfiguredModel(target)) {
++        if (!workerRuntimeModel && ctx.model) captureWorkerRuntime(ctx);
++        if (workerRuntimeModel && !sameModel(ctx.model, workerRuntimeModel)) {
++          const changed = await pi.setModel(workerRuntimeModel);
++          if (!changed) throw new Error(`No usable credentials for ${workerRuntimeModel.provider}/${modelId(workerRuntimeModel)}`);
++        }
++        if (target.thinkingMode === "configured" && target.thinking) pi.setThinkingLevel(target.thinking);
++        else if (workerRuntimeThinking) pi.setThinkingLevel(workerRuntimeThinking);
++      } else {
++        const model = findConfiguredModel(ctx, target);
++        if (!model) throw new Error(`Configured ${role} model was not found: ${describeModel(target)}`);
++        const changed = await pi.setModel(model);
++        if (!changed) throw new Error(`No Cascade credential for ${describeModel(target)}. Run /login ${target.provider}.`);
++        if (target.thinkingMode !== "native" && target.thinking) pi.setThinkingLevel(target.thinking);
++      }
++    } finally {
++      roleSwitchInProgress = false;
++    }
++
++    applyTools(role, target);
+     currentRole = role;
+     blockedReason = "";
+-    if (!quiet) notify(ctx, `Cascade active role: ${role} (${describeModel(target)})`, "info");
++    if (!quiet) {
++      const label = role === "worker" && !usesConfiguredModel(target) ? "current model" : describeModel(target);
++      notify(ctx, `Active ${role}: ${label}`, "info");
++    }
+     updateStatus(ctx);
+   }
+ 
+   function initialize(ctx) {
+     activeCtx = ctx;
+     const result = loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
++    if (!usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
+     registerConfiguredProviders(pi, config, { onWarning: (message) => notify(ctx, message, "warning") });
+     const piSessionId = ctx.sessionManager?.getSessionId?.();
+     ledger = new EvidenceLedger({ cwd: ctx.cwd, config, harnessManifest: { pending: true }, sessionId: piSessionId });
+@@ -323,15 +370,17 @@ ${state.stagedStat || ""}`, 24),
+     completionGateRuns = 0;
+     completionGateInFlight = false;
+     blockedReason = "";
+-    const initialProfile = currentRole === "expert" ? config.expert : config.worker;
++    const initialProfile = currentRole === "expert"
++      ? config.expert
++      : (usesConfiguredModel(config.worker) ? config.worker : activeModelConfig(ctx, config, currentRole));
+     const initialPolicy = policyFor(initialProfile);
+     if (!initialPolicy.allowed) blockedReason = initialPolicy.reason;
+     initialized = true;
+     for (const warning of result.validation.warnings) notify(ctx, warning, "warning");
+     if (result.validation.errors.length) {
+-      blockedReason = result.validation.errors.join("; ");
+-      notify(ctx, `Cascade configuration errors: ${blockedReason}`, "error");
++      notify(ctx, `Configuration warning: ${result.validation.errors.join("; ")}. Use /cascade-setup to repair it.`, "warning");
+     }
++    if (process.env.CASCADE_STARTUP_WARNING) notify(ctx, process.env.CASCADE_STARTUP_WARNING, "warning");
+     updateStatus(ctx);
+   }
+ 
+@@ -578,13 +627,12 @@ ${state.stagedStat || ""}`, 24),
+   pi.on("session_start", async (_event, ctx) => {
+     initialize(ctx);
+     if (process.env.CASCADE_CHILD === "1") return;
+-    if (!blockedReason) {
+-      try {
+-        await activateRole("worker", ctx, { quiet: true });
+-      } catch (error) {
+-        blockedReason = error instanceof Error ? error.message : String(error);
+-        notify(ctx, `Cascade could not activate worker: ${blockedReason}`, "error");
+-      }
++    try {
++      await activateRole("worker", ctx, { quiet: true });
++    } catch (error) {
++      blockedReason = "";
++      notify(ctx, `${error instanceof Error ? error.message : String(error)} The TUI remains available; use /login, /model, or /cascade-setup.`, "warning");
++      applyTools("worker", config.worker);
+     }
+     updateStatus(ctx);
+   });
+@@ -838,16 +886,130 @@ ${summarizeVerificationReport(report)}` }],
+     });
+   });
+ 
+-  pi.on("model_select", (_event, ctx) => {
++  pi.on("model_select", (event, ctx) => {
+     activeCtx = ctx;
++    if (!roleSwitchInProgress) {
++      if (currentRole === "worker") {
++        workerRuntimeModel = event.model;
++        workerRuntimeThinking = ctx.thinkingLevel;
++        config.worker = { ...config.worker, provider: event.model.provider, model: modelId(event.model) };
++      } else if (currentRole === "expert") {
++        config.expert = { ...config.expert, selectionMode: "configured", provider: event.model.provider, model: modelId(event.model) };
++      }
++    }
+     updateStatus(ctx);
+   });
+ 
++  pi.on("thinking_level_select", (event, ctx) => {
++    activeCtx = ctx;
++    if (!roleSwitchInProgress) {
++      if (currentRole === "worker") {
++        workerRuntimeThinking = event.level;
++        if (config.worker.thinkingMode === "configured") config.worker.thinking = event.level;
++      } else if (currentRole === "expert") {
++        config.expert = { ...config.expert, thinkingMode: "configured", thinking: event.level };
++      }
++    }
++    updateStatus(ctx);
++  });
++
++  async function applySetupResult(result, ctx) {
++    if (!result || result.cancelled) return false;
++    if (result.scope === "session") config = result.config;
++    else loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
++    validation = validateConfig(config);
++    registerConfiguredProviders(pi, config, { onWarning: (message) => notify(ctx, message, "warning") });
++    if (validation.errors.length) {
++      notify(ctx, `Configuration errors: ${validation.errors.join("; ")}`, "error");
++      return false;
++    }
++    if (!usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
++    const role = currentRole === "expert" && config.mode === "dual" ? "expert" : "worker";
++    try { await activateRole(role, ctx, { quiet: true }); }
++    catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "warning"); }
++    notify(ctx, result.path ? `Settings saved to ${result.path}` : "Settings applied to this session", "info");
++    if (result.loginProvider) prepareNativeLogin(ctx, result.loginProvider);
++    updateStatus(ctx);
++    return true;
++  }
++
++  async function openSetup(ctx) {
++    ensureInitialized(ctx);
++    return applySetupResult(await runCascadeSetup({ ctx, config }), ctx);
++  }
++
++  async function openRoleModelPicker(role, ctx) {
++    ensureInitialized(ctx);
++    const result = await runRoleModelPicker({ ctx, config, role });
++    if (!result || result.cancelled) return false;
++    config = result.config;
++    if (result.scope !== "session") loadConfig(ctx.cwd, ctx.isProjectTrusted?.() ?? false);
++    if (role === "worker" && !usesConfiguredModel(config.worker) && ctx.model) captureWorkerRuntime(ctx);
++    try { if (currentRole === role || role === "worker") await activateRole(role, ctx, { quiet: true }); }
++    catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "warning"); }
++    notify(ctx, result.path ? `${role} model saved to ${result.path}` : `${role} model changed for this session`, "info");
++    if (result.loginProvider) prepareNativeLogin(ctx, result.loginProvider);
++    updateStatus(ctx);
++    return true;
++  }
++
++  pi.registerCommand("cascade-setup", {
++    description: "Configure Cascade in the TUI",
++    async handler(_args, ctx) {
++      try { await openSetup(ctx); }
++      catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "error"); }
++    }
++  });
++
++  pi.registerCommand("cascade-worker", {
++    description: "Choose the worker model",
++    async handler(_args, ctx) {
++      try { await openRoleModelPicker("worker", ctx); }
++      catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "error"); }
++    }
++  });
++
++  pi.registerCommand("cascade-expert", {
++    description: "Choose the expert model",
++    async handler(_args, ctx) {
++      try { await openRoleModelPicker("expert", ctx); }
++      catch (error) { notify(ctx, error instanceof Error ? error.message : String(error), "error"); }
++    }
++  });
++
++  pi.registerCommand("cascade-auth", {
++    description: "Prepare the native /login flow for a provider",
++    async handler(args, ctx) {
++      ensureInitialized(ctx);
++      const requested = String(args || "").trim();
++      const provider = requested || await chooseLoginProvider(ctx);
++      if (provider) prepareNativeLogin(ctx, provider);
++    }
++  });
++
++  pi.registerCommand("cascade-compaction", {
++    description: "Configure global Cascade compaction limits",
++    async handler(args, ctx) {
++      ensureInitialized(ctx);
++      if (String(args || "").trim() === "show") {
++        notify(ctx, JSON.stringify(getCascadeGlobalCompaction(), null, 2), "info");
++        return;
++      }
++      try {
++        const result = await runCompactionSetup(ctx);
++        if (!result.cancelled) notify(ctx, `Global compaction settings saved to ${result.path}. Restart Cascade to apply them.`, "info");
++      } catch (error) {
++        notify(ctx, error instanceof Error ? error.message : String(error), "error");
++      }
++    }
++  });
++
+   pi.registerCommand("cascade", {
+     description: "Show or reload Cascade status",
+     async handler(args, ctx) {
+       ensureInitialized(ctx);
+       const [action] = parseWords(args);
++      if (action === "setup") return await openSetup(ctx);
+       if (action === "reload") {
+         initialize(ctx);
+         await activateRole(currentRole === "expert" && config.mode === "dual" ? "expert" : "worker", ctx, { quiet: true });
+@@ -863,14 +1025,38 @@ ${summarizeVerificationReport(report)}` }],
+         totals: ledger.totals(),
+         privacy: {
+           classification: config.privacy.classification,
+-          worker: policyFor(config.worker),
++          worker: policyFor(usesConfiguredModel(config.worker) ? config.worker : activeModelConfig(ctx, config, "worker")),
+           expert: config.mode === "dual" ? policyFor(config.expert) : undefined
+         },
+         harness: harness.manifest(),
+         configSources,
+         blockedReason: blockedReason || null
+       };
+-      notify(ctx, JSON.stringify(report, null, 2), blockedReason ? "error" : "info");
++      if (action === "details" || action === "json") {
++        notify(ctx, JSON.stringify(report, null, 2), blockedReason ? "error" : "info");
++      } else {
++        const runtimeProvider = ctx.model?.provider;
++        const runtimeModel = modelId(ctx.model);
++        const runtimeLabel = !runtimeProvider || runtimeProvider === "unknown" || !runtimeModel || runtimeModel === "unknown"
++          ? "not selected"
++          : `${runtimeProvider}/${runtimeModel}`;
++        const worker = usesConfiguredModel(config.worker)
++          ? describeModel(config.worker)
++          : `current Cascade model (${runtimeLabel})`;
++        const expert = config.mode === "dual" ? describeModel(config.expert) : "disabled";
++        const totals = report.totals;
++        const route = report.route;
++        notify(ctx, [
++          `Cascade ${PACKAGE_VERSION}`,
++          `Mode: ${config.mode} · active role: ${currentRole}`,
++          `Worker: ${worker}`,
++          `Expert: ${expert}`,
++          `Route: ${route.level} (${Number(route.score || 0).toFixed(1)})`,
++          `Usage: ${totals.expertCalls || 0} expert calls · $${Number(totals.estimatedTotalCostUsd || 0).toFixed(3)}`,
++          `Privacy: ${config.privacy.classification} · Contributor ${config.privacy.allowContributor ? "allowed" : "blocked"}`,
++          blockedReason ? `Attention: ${blockedReason}` : "Ready. Use /cascade-setup to change settings; /cascade details for JSON."
++        ].join("\n"), blockedReason ? "error" : "info");
++      }
+       updateStatus(ctx);
+     }
+   });
+diff --git a/package-lock.json b/package-lock.json
+index 659be58..c73558a 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "cascade",
+-  "version": "0.2.0",
++  "version": "0.4.0",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "cascade",
+-      "version": "0.2.0",
++      "version": "0.4.0",
+       "license": "MIT",
+       "dependencies": {
+         "@earendil-works/pi-coding-agent": "0.84.2"
+diff --git a/package.json b/package.json
+index 9073047..1269bac 100644
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "cascade",
+-  "version": "0.2.0",
+-  "description": "Independent configurable one- or two-model, evidence-centered coding agent powered by the Pi runtime",
++  "version": "0.4.0",
++  "description": "Cascade coding agent with isolated state, native TUI, and configurable worker/expert orchestration on the Pi engine",
+   "type": "module",
+   "license": "MIT",
+   "bin": {
+@@ -33,11 +33,6 @@
+     "CONTRIBUTING.md",
+     "SECURITY.md"
+   ],
+-  "pi": {
+-    "extensions": [
+-      "./extension/index.mjs"
+-    ]
+-  },
+   "engines": {
+     "node": ">=22.19.0"
+   },
+@@ -49,7 +44,8 @@
+     "pack:local": "npm pack --ignore-scripts",
+     "release:local": "node scripts/release-local.mjs",
+     "legal:check": "node scripts/check-legal.mjs",
+-    "ci": "npm test && npm run check && npm run brand:check && npm run legal:check && npm run smoke"
++    "ci": "npm test && npm run check && npm run brand:check && npm run legal:check && npm run smoke",
++    "tui:smoke": "python3 scripts/tui-smoke.py"
+   },
+   "dependencies": {
+     "@earendil-works/pi-coding-agent": "0.84.2"
+diff --git a/scripts/apply-to-pi.mjs b/scripts/apply-to-pi.mjs
+deleted file mode 100755
+index 214e997..0000000
+--- a/scripts/apply-to-pi.mjs
++++ /dev/null
+@@ -1,70 +0,0 @@
+-#!/usr/bin/env node
+-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+-import { dirname, join, resolve } from "node:path";
+-import { fileURLToPath } from "node:url";
+-import { atomicWriteJson } from "../extension/core/util.mjs";
+-
+-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+-const UPSTREAM = Object.freeze(JSON.parse(readFileSync(join(packageRoot, "UPSTREAM.json"), "utf8")));
+-
+-function parse(argv) {
+-  const options = { force: false };
+-  for (let index = 0; index < argv.length; index += 1) {
+-    const arg = argv[index];
+-    if (arg === "--pi-source") options.piSource = resolve(argv[++index]);
+-    else if (arg === "--force") options.force = true;
+-    else if (["-h", "--help"].includes(arg)) options.help = true;
+-    else throw new Error(`Unknown argument: ${arg}`);
+-  }
+-  return options;
+-}
+-
+-function main() {
+-  const options = parse(process.argv.slice(2));
+-  if (options.help || !options.piSource) {
+-    console.log("Usage: node scripts/apply-to-pi.mjs --pi-source /path/to/pi [--force]");
+-    return;
+-  }
+-  const rootPackagePath = join(options.piSource, "package.json");
+-  const codingAgentPath = join(options.piSource, "packages", "coding-agent", "package.json");
+-  if (!existsSync(rootPackagePath) || !existsSync(codingAgentPath)) {
+-    throw new Error(`${options.piSource} is not a compatible Pi source checkout`);
+-  }
+-  const codingAgent = JSON.parse(readFileSync(codingAgentPath, "utf8"));
+-  if (codingAgent.name !== "@earendil-works/pi-coding-agent") throw new Error("Unexpected Pi coding-agent package identity");
+-  const target = join(options.piSource, "packages", "cascade");
+-  if (existsSync(target)) {
+-    if (!options.force) throw new Error(`Target already exists: ${target}. Use --force to replace it.`);
+-    rmSync(target, { recursive: true, force: true });
+-  }
+-  mkdirSync(target, { recursive: true });
+-  for (const entry of [
+-    "bin", "extension", "docs", "examples", "licenses", "policies", "scripts", "tests",
+-    "README.md", "INSTALL.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "UPSTREAM.json", "CHANGELOG.md",
+-    "CONTRIBUTING.md", "SECURITY.md", "TEST_REPORT.md", "package.json"
+-  ]) {
+-    cpSync(join(packageRoot, entry), join(target, entry), { recursive: true });
+-  }
+-  const rootPackage = JSON.parse(readFileSync(rootPackagePath, "utf8"));
+-  rootPackage.scripts ||= {};
+-  rootPackage.scripts.cascade = "node packages/cascade/bin/cascade.mjs";
+-  rootPackage.scripts["cascade:test"] = "npm test --workspace=cascade";
+-  rootPackage.scripts["cascade:check"] = "npm run check --workspace=cascade";
+-  rootPackage.scripts["cascade:smoke"] = "npm run smoke --workspace=cascade";
+-  atomicWriteJson(rootPackagePath, rootPackage, 0o644);
+-  atomicWriteJson(join(options.piSource, "CASCADE_UPSTREAM.json"), {
+-    ...UPSTREAM,
+-    expectedCodingAgentVersion: UPSTREAM.codingAgentVersion,
+-    detectedCodingAgentVersion: codingAgent.version,
+-    appliedAt: new Date().toISOString(),
+-    integration: "workspace package and supported Pi extension APIs"
+-  }, 0o644);
+-  console.log(`Applied Cascade to ${options.piSource}`);
+-  console.log("Run: npm install --ignore-scripts && npm run cascade -- --approve \"your task\"");
+-}
+-
+-try { main(); }
+-catch (error) {
+-  console.error(`apply-to-pi: ${error instanceof Error ? error.message : String(error)}`);
+-  process.exitCode = 1;
+-}
+diff --git a/scripts/bootstrap-fork.mjs b/scripts/bootstrap-fork.mjs
+deleted file mode 100755
+index 336fd09..0000000
+--- a/scripts/bootstrap-fork.mjs
++++ /dev/null
+@@ -1,50 +0,0 @@
+-#!/usr/bin/env node
+-import { execFileSync } from "node:child_process";
+-import { existsSync, readFileSync } from "node:fs";
+-import { dirname, resolve } from "node:path";
+-import { fileURLToPath } from "node:url";
+-
+-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+-const upstream = JSON.parse(readFileSync(resolve(packageRoot, "UPSTREAM.json"), "utf8"));
+-
+-function parse(argv) {
+-  const result = { target: "./cascade-fork", branch: "cascade" };
+-  const positional = [];
+-  for (let index = 0; index < argv.length; index += 1) {
+-    const arg = argv[index];
+-    if (arg === "--branch") result.branch = argv[++index];
+-    else if (arg === "--remote") result.remote = argv[++index];
+-    else if (["-h", "--help"].includes(arg)) result.help = true;
+-    else positional.push(arg);
+-  }
+-  if (positional[0]) result.target = positional[0];
+-  return result;
+-}
+-
+-function run(executable, args, options = {}) {
+-  return execFileSync(executable, args, { stdio: "inherit", ...options });
+-}
+-
+-function main() {
+-  const options = parse(process.argv.slice(2));
+-  if (options.help) {
+-    console.log("Usage: node scripts/bootstrap-fork.mjs [TARGET] [--branch NAME] [--remote URL]");
+-    return;
+-  }
+-  const target = resolve(options.target);
+-  if (existsSync(target)) throw new Error(`Target already exists: ${target}`);
+-  const remote = options.remote || `https://github.com/${upstream.repository}.git`;
+-
+-  run("git", ["clone", "--no-checkout", remote, target]);
+-  run("git", ["fetch", "--depth", "1", "origin", upstream.commit], { cwd: target });
+-  run("git", ["checkout", "-b", options.branch, upstream.commit], { cwd: target });
+-  run(process.execPath, [resolve(packageRoot, "scripts", "apply-to-pi.mjs"), "--pi-source", target], { cwd: packageRoot });
+-  console.log(`Fork source prepared at ${target}`);
+-  console.log(`Branch: ${options.branch}; upstream: ${upstream.repository}@${upstream.commit}`);
+-}
+-
+-try { main(); }
+-catch (error) {
+-  console.error(`bootstrap-fork: ${error instanceof Error ? error.message : String(error)}`);
+-  process.exitCode = 1;
+-}
+diff --git a/scripts/check.mjs b/scripts/check.mjs
+index c5a8803..7ef2534 100755
+--- a/scripts/check.mjs
++++ b/scripts/check.mjs
+@@ -32,6 +32,7 @@ const runtimeVersion = defaults.match(/PACKAGE_VERSION\s*=\s*["']([^"']+)["']/)?
+ 
+ for (const required of [
+   "bin/cascade.mjs",
++  "extension/cascade.mjs",
+   "extension/index.mjs",
+   "README.md",
+   "INSTALL.md",
+@@ -45,7 +46,7 @@ for (const required of [
+ ]) {
+   if (!existsSync(join(root, required))) failures.push(`Missing required file: ${required}`);
+ }
+-if (packageJson.pi?.extensions?.[0] !== "./extension/index.mjs") failures.push("package.json Pi extension manifest is invalid");
++if (packageJson.pi !== undefined) failures.push("Standalone Cascade must not expose a Pi package manifest");
+ if (packageJson.bin?.["cascade"] !== "./bin/cascade.mjs") failures.push("package.json binary manifest is invalid");
+ if (packageJson.dependencies?.["@earendil-works/pi-coding-agent"] !== "0.84.2") {
+   failures.push("package.json must pin the standalone Pi runtime dependency to 0.84.2");
+@@ -60,6 +61,10 @@ for (const requiredPackageFile of ["INSTALL.md", "licenses", "THIRD_PARTY_NOTICE
+   if (!packageJson.files?.includes(requiredPackageFile)) failures.push(`package.json files omits ${requiredPackageFile}`);
+ }
+ 
++for (const obsolete of ["scripts/apply-to-pi.mjs", "scripts/bootstrap-fork.mjs", "tests/apply-to-pi.test.mjs"]) {
++  if (existsSync(join(root, obsolete))) failures.push(`Obsolete Pi-overlay artifact remains: ${obsolete}`);
++}
++
+ // Prevent the removed optional integration from quietly returning in source or docs.
+ const removedIntegration = ["j", "space"].join("[- ]?");
+ const removedPattern = new RegExp(removedIntegration, "i");
+diff --git a/scripts/package-smoke.mjs b/scripts/package-smoke.mjs
+index 1f841f3..2856723 100755
+--- a/scripts/package-smoke.mjs
++++ b/scripts/package-smoke.mjs
+@@ -66,7 +66,22 @@ try {
+     files: ["dist"]
+   }, null, 2)}\n`);
+   writeFileSync(join(fakePiDir, "dist", "index.js"), "export const smokeRuntime = true;\n");
+-  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node\nimport { writeFileSync } from "node:fs";\nconst args = process.argv.slice(2);\nif (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }\nif (process.env.CASCADE_SMOKE_ARGS) writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify(args));\nconsole.log("pi smoke runtime");\n`);
++  writeFileSync(join(fakePiDir, "dist", "cli.js"), `#!/usr/bin/env node
++import { writeFileSync } from "node:fs";
++const args = process.argv.slice(2);
++if (args.includes("--version") || args.includes("-v")) { console.log("pi 0.84.2-smoke"); process.exit(0); }
++if (process.env.CASCADE_SMOKE_ARGS) {
++  writeFileSync(process.env.CASCADE_SMOKE_ARGS, JSON.stringify({
++    args,
++    env: {
++      agentDir: process.env.PI_CODING_AGENT_DIR,
++      sessionDir: process.env.PI_CODING_AGENT_SESSION_DIR,
++      agentName: process.env.AI_AGENT
++    }
++  }));
++}
++console.log("cascade engine smoke runtime");
++`);
+   chmodSync(join(fakePiDir, "dist", "cli.js"), 0o755);
+ 
+   cpSync(packageRoot, gitSource, {
+@@ -187,6 +202,8 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
+   const installedRoot = join(installDir, "node_modules", "cascade");
+   const installedPackage = JSON.parse(readFileSync(join(installedRoot, "package.json"), "utf8"));
+   if (installedPackage.name !== "cascade") throw new Error("Installed package identity is incorrect");
++  if (installedPackage.pi !== undefined) throw new Error("Standalone Cascade unexpectedly exposes a Pi package manifest");
++  if (!existsSync(join(installedRoot, "extension", "cascade.mjs"))) throw new Error("Cascade application extension is missing");
+   if (installedPackage.dependencies?.["@earendil-works/pi-coding-agent"] !== "0.84.2") {
+     throw new Error("Standalone Pi runtime dependency is missing or unpinned");
+   }
+@@ -231,25 +248,72 @@ process.on("SIGTERM", () => server.close(() => process.exit(0)));
+     throw new Error(`Git-source standalone self-test failed: ${gitSelfTest}`);
+   }
+ 
++  const isolatedHome = join(temporary, "isolated-home");
++  const staleProject = join(temporary, "stale-project");
++  mkdirSync(join(staleProject, ".cascade"), { recursive: true });
++  writeFileSync(join(staleProject, ".cascade", "config.json"), `${JSON.stringify({
++    schemaVersion: 1,
++    mode: "dual",
++    worker: {
++      provider: "meta-model-api",
++      model: "muse-spark-1.2-contributor",
++      thinking: "medium",
++      tools: ["read", "write"]
++    },
++    expert: {
++      provider: "openrouter",
++      model: "openrouter/auto",
++      thinking: "high",
++      tools: ["read"]
++    },
++    privacy: { classification: "unknown", allowContributor: false }
++  }, null, 2)}\n`);
++
+   const argsPath = join(temporary, "spawn-args.json");
+-  run(process.execPath, [
+-    cli,
+-    "--single",
+-    "--worker", "openrouter/vendor/smoke-worker",
+-    "--",
+-    "--mode", "json",
+-    "hello"
+-  ], {
+-    cwd: installDir,
++  run(process.execPath, [cli, "--approve", "--mode", "json", "hello"], {
++    cwd: staleProject,
+     capture: true,
+-    env: { ...process.env, CASCADE_SMOKE_ARGS: argsPath, CASCADE_STATE_DIR: join(temporary, "state") }
++    env: {
++      ...process.env,
++      HOME: isolatedHome,
++      CASCADE_SMOKE_ARGS: argsPath,
++      CASCADE_STATE_DIR: join(temporary, "state")
++    }
+   });
+-  const spawnedArgs = JSON.parse(readFileSync(argsPath, "utf8"));
+-  if (!spawnedArgs.includes("--extension") || !spawnedArgs.includes("vendor/smoke-worker")) {
+-    throw new Error(`Standalone wrapper did not launch bundled Pi correctly: ${JSON.stringify(spawnedArgs)}`);
++  const launch = JSON.parse(readFileSync(argsPath, "utf8"));
++  const spawnedArgs = launch.args;
++  const extensionIndex = spawnedArgs.indexOf("--extension");
++  if (
++    !spawnedArgs.includes("--no-extensions") ||
++    !spawnedArgs.includes("--no-skills") ||
++    extensionIndex < 0 ||
++    !String(spawnedArgs[extensionIndex + 1] || "").endsWith(join("extension", "cascade.mjs")) ||
++    spawnedArgs.includes("--provider") ||
++    spawnedArgs.includes("--model")
++  ) {
++    throw new Error(`Standalone wrapper did not launch the isolated Cascade application correctly: ${JSON.stringify(launch)}`);
++  }
++  const expectedAgentDir = join(isolatedHome, ".cascade", "agent");
++  if (launch.env.agentDir !== expectedAgentDir || launch.env.sessionDir !== join(expectedAgentDir, "sessions")) {
++    throw new Error(`Cascade engine directories are not isolated: ${JSON.stringify(launch.env)}`);
++  }
++  if (launch.env.agentName !== "cascade") throw new Error(`Cascade engine identity is incorrect: ${JSON.stringify(launch.env)}`);
++
++  const compaction = run(process.execPath, [
++    cli,
++    "compaction", "set",
++    "--reserve-tokens", "12000",
++    "--keep-recent-tokens", "18000"
++  ], { cwd: installDir, capture: true, env: { ...process.env, HOME: isolatedHome } });
++  const compactionResult = JSON.parse(compaction);
++  if (compactionResult.compaction.reserveTokens !== 12000 || compactionResult.compaction.keepRecentTokens !== 18000) {
++    throw new Error(`Global compaction settings did not persist: ${compaction}`);
+   }
+ 
+-  console.log(`Standalone package and Git-source smoke tests passed: ${cascadeTarball}`);
++  const updatePlan = run(process.execPath, [cli, "update", "--dry-run"], { cwd: installDir, capture: true });
++  if (!updatePlan.includes("TanushV/cascade.git#main")) throw new Error(`Self-update plan is incorrect: ${updatePlan}`);
++
++  console.log(`Standalone package, isolation, compaction, update, and Git-source smoke tests passed: ${cascadeTarball}`);
+ } finally {
+   if (process.env.CASCADE_SMOKE_KEEP !== "1") rmSync(temporary, { recursive: true, force: true });
+   else console.log(`Smoke workspace retained at ${temporary}`);
+diff --git a/tests/apply-to-pi.test.mjs b/tests/apply-to-pi.test.mjs
+deleted file mode 100644
+index 690db13..0000000
+--- a/tests/apply-to-pi.test.mjs
++++ /dev/null
+@@ -1,25 +0,0 @@
+-import test from "node:test";
+-import assert from "node:assert/strict";
+-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+-import { tmpdir } from "node:os";
+-import { dirname, join } from "node:path";
+-import { fileURLToPath } from "node:url";
+-import { spawnSync } from "node:child_process";
+-
+-const root = dirname(dirname(fileURLToPath(import.meta.url)));
+-
+-test("apply-to-pi creates a workspace package and minimal root scripts", () => {
+-  const pi = mkdtempSync(join(tmpdir(), "fake-pi-source-"));
+-  mkdirSync(join(pi, "packages", "coding-agent"), { recursive: true });
+-  writeFileSync(join(pi, "package.json"), JSON.stringify({ name: "pi-monorepo", private: true, workspaces: ["packages/*"], scripts: {} }));
+-  writeFileSync(join(pi, "packages", "coding-agent", "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", version: "0.84.2" }));
+-  const result = spawnSync(process.execPath, [join(root, "scripts", "apply-to-pi.mjs"), "--pi-source", pi], { encoding: "utf8" });
+-  assert.equal(result.status, 0, result.stderr);
+-  const rootPackage = JSON.parse(readFileSync(join(pi, "package.json"), "utf8"));
+-  assert.equal(rootPackage.scripts.cascade, "node packages/cascade/bin/cascade.mjs");
+-  assert.equal(rootPackage.scripts["cascade:check"], "npm run check --workspace=cascade");
+-  assert.match(readFileSync(join(pi, "CASCADE_UPSTREAM.json"), "utf8"), /59a71b/);
+-  assert.match(readFileSync(join(pi, "packages", "cascade", "README.md"), "utf8"), /Cascade/);
+-  assert.match(readFileSync(join(pi, "packages", "cascade", "UPSTREAM.json"), "utf8"), /0.84.2/);
+-  assert.ok(readFileSync(join(pi, "packages", "cascade", "tests", "router.test.mjs"), "utf8").includes("repeated verifier failures"));
+-});
+diff --git a/tests/extension-integration.test.mjs b/tests/extension-integration.test.mjs
+index 00b48e3..711cd3b 100644
+--- a/tests/extension-integration.test.mjs
++++ b/tests/extension-integration.test.mjs
+@@ -80,8 +80,8 @@ test("dual extension runs a fully configured isolated expert consultation", asyn
+     schemaVersion: 1,
+     mode: "dual",
+     piBinary: fake,
+-    worker: { provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
+-    expert: { provider: "openrouter", model: "expert", thinking: "high", tools: ["read", "grep", "bash"], timeoutMs: 5000 },
++    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
++    expert: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "expert", thinking: "high", tools: ["read", "grep", "bash"], timeoutMs: 5000 },
+     privacy: { classification: "internal", allowContributor: false },
+     routing: { autoConsult: false }
+   }));
+@@ -116,7 +116,7 @@ test("contributor input is redacted, images are denied, and protected paths are
+   writeFileSync(configPath, JSON.stringify({
+     schemaVersion: 1,
+     mode: "single",
+-    worker: { provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read", "bash"] },
++    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read", "bash"] },
+     privacy: { classification: "public", allowContributor: true, allowImagesToContributor: false, redactSecrets: true }
+   }));
+   const cleanup = withCascadeEnvironment(configPath, statePath);
+@@ -157,7 +157,7 @@ test("session cost budget blocks later prompts after recorded worker usage", asy
+   writeFileSync(configPath, JSON.stringify({
+     schemaVersion: 1,
+     mode: "single",
+-    worker: { provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read"] },
++    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "meta-model-api", model: "muse-spark-1.2-contributor", thinking: "low", tools: ["read"] },
+     privacy: { classification: "public", allowContributor: true },
+     budgets: { maxSessionEstimatedCostUsd: 0.001 }
+   }));
+@@ -193,7 +193,7 @@ test("completion gate verifies a real changed Git worktree before accepting sett
+   writeFileSync(configPath, JSON.stringify({
+     schemaVersion: 1,
+     mode: "single",
+-    worker: { provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
++    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
+     privacy: { classification: "internal", allowContributor: false },
+     verification: { requireBeforeCompletion: true, autoRunBeforeCompletion: true, maxCompletionGateRuns: 1, timeoutMs: 10000 }
+   }));
+@@ -229,7 +229,7 @@ test("a successful non-verifier command cannot bypass the completion gate", asyn
+   writeFileSync(configPath, JSON.stringify({
+     schemaVersion: 1,
+     mode: "single",
+-    worker: { provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
++    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker", thinking: "low", tools: ["read", "bash", "edit"] },
+     privacy: { classification: "internal", allowContributor: false },
+     verification: { requireBeforeCompletion: true, autoRunBeforeCompletion: true, maxCompletionGateRuns: 1, timeoutMs: 10000 }
+   }));
+diff --git a/tests/extension.test.mjs b/tests/extension.test.mjs
+index 0c1f0ee..cfe0079 100644
+--- a/tests/extension.test.mjs
++++ b/tests/extension.test.mjs
+@@ -53,7 +53,7 @@ test("extension initializes single-model worker and records route evidence", asy
+   writeFileSync(configPath, JSON.stringify({
+     schemaVersion: 1,
+     mode: "single",
+-    worker: { provider: "openrouter", model: "worker-model", thinking: "low", tools: ["read", "bash", "edit"] },
++    worker: { selectionMode: "configured", thinkingMode: "configured", provider: "openrouter", model: "worker-model", thinking: "low", tools: ["read", "bash", "edit"] },
+     privacy: { classification: "internal", allowContributor: false }
+   }));
+   process.env.CASCADE_CONFIG = configPath;
+@@ -84,7 +84,7 @@ test("extension initializes single-model worker and records route evidence", asy
+   await emit(mock, "tool_result", { toolName: "bash", input: { command: "npm test" }, content: [{ type: "text", text: "tests failed" }], isError: true, details: { exitCode: 1 }, toolCallId: "1" }, ctx);
+   const route = await mock.tools.get("cascade_route").execute("x", { refreshRepository: false }, undefined, undefined, ctx);
+   assert.match(route.content[0].text, /toolError/);
+-  assert.ok(mock.statuses.get("cascade").includes("cascade:single"));
++  assert.match(mock.statuses.get("cascade"), /^worker · single · route /);
+ 
+   delete process.env.CASCADE_CONFIG;
+   delete process.env.CASCADE_STATE_DIR;
+diff --git a/tests/privacy.test.mjs b/tests/privacy.test.mjs
+index 9d59f20..447ed79 100644
+--- a/tests/privacy.test.mjs
++++ b/tests/privacy.test.mjs
+@@ -6,12 +6,13 @@ import { deepClone } from "../extension/core/util.mjs";
+ 
+ test("contributor models require public explicit consent", () => {
+   const config = deepClone(DEFAULT_CONFIG);
+-  assert.equal(evaluateContributorPolicy(config, config.worker).allowed, false);
++  const contributor = { provider: "meta-model-api", model: "muse-spark-1.2-contributor" };
++  assert.equal(evaluateContributorPolicy(config, contributor).allowed, false);
+   config.privacy.allowContributor = true;
+   config.privacy.classification = "public";
+-  assert.equal(evaluateContributorPolicy(config, config.worker).allowed, true);
++  assert.equal(evaluateContributorPolicy(config, contributor).allowed, true);
+   config.privacy.classification = "confidential";
+-  assert.equal(evaluateContributorPolicy(config, config.worker).allowed, false);
++  assert.equal(evaluateContributorPolicy(config, contributor).allowed, false);
+ });
+ 
+ test("private models are not blocked by contributor policy", () => {
+diff --git a/tests/router.test.mjs b/tests/router.test.mjs
+index bdccfa7..e2b9b1a 100644
+--- a/tests/router.test.mjs
++++ b/tests/router.test.mjs
+@@ -36,6 +36,8 @@ test("single mode never admits expert", () => {
+ 
+ test("dual mode automatically admits an expert only after the consult threshold", () => {
+   const config = deepClone(DEFAULT_CONFIG);
++  config.mode = "dual";
++  config.routing.autoConsult = true;
+   const router = new AdaptiveRouter(config);
+   const ledger = { totals: () => ({ expertCalls: 0, expertCostUsd: 0, estimatedTotalCostUsd: 0 }) };
+   router.onTurnStart(1);
+diff --git a/tests/wrapper.test.mjs b/tests/wrapper.test.mjs
+index 3e6eedd..eb9de5d 100644
+--- a/tests/wrapper.test.mjs
++++ b/tests/wrapper.test.mjs
+@@ -38,7 +38,10 @@ test("wrapper injects extension and fully configurable worker", () => {
+   assert.notEqual(extensionIndex, -1);
+   assert.equal(typeof args[extensionIndex + 1], "string");
+   assert.ok(args[extensionIndex + 1].length > 0);
+-  assert.deepEqual(args.slice(args.indexOf("--provider"), args.indexOf("--provider") + 4), ["--provider", "openrouter", "--model", "vendor/worker-model"]);
++  assert.equal(args.includes("--provider"), false);
++  assert.equal(args.includes("--model"), false);
++  assert.ok(args.includes("--no-extensions"));
++  assert.ok(args.includes("--no-skills"));
+   assert.ok(args.includes("hello"));
+   assert.equal(captured.env.workerTools, "read,grep,bash");
+   assert.equal(captured.env.expertTools, "read,grep");
+@@ -78,5 +81,6 @@ test("wrapper launches the packaged runtime without a global pi command", () =>
+   assert.equal(result.status, 0, result.stderr);
+   const args = JSON.parse(readFileSync(argsFile, "utf8"));
+   assert.ok(args.includes("--extension"));
+-  assert.ok(args.includes("vendor/worker-model"));
++  assert.equal(args.includes("vendor/worker-model"), false);
++  assert.ok(args.includes("--no-extensions"));
+ });
+STATUS decompress_patch=0
+STATUS write_patch=0
+===== apply_check =====
+STATUS apply_check=0
+===== apply_patch =====
+STATUS apply_patch=0
+===== concatenate_new =====
+STATUS concatenate_new=0
+===== new_digest =====
+7ac419cbb8ee41c9760d280f6ea97bc8540a41bc343832c1ff20578102bac6fa  /home/runner/work/_temp/cascade-new-files.tar.gz
+STATUS new_digest=0
+===== new_digest_check =====
+/home/runner/work/_temp/cascade-new-files.tar.gz: OK
+STATUS new_digest_check=0
+===== list_new =====
+extension/cascade.mjs
+extension/core/cascade-paths.mjs
+extension/core/pi-parity.mjs
+extension/core/pi-settings.mjs
+extension/core/tui-setup.mjs
+extension/core/updater.mjs
+scripts/tui-smoke.py
+tests/actual-agent-usage.test.mjs
+tests/paths-settings.test.mjs
+tests/pi-parity.test.mjs
+tests/tui-isolation.test.mjs
+tests/tui-setup.test.mjs
+tests/updater.test.mjs
+STATUS list_new=0
+===== extract_new =====
+STATUS extract_new=0
+===== node_version =====
+v22.19.0
+STATUS node_version=0
+===== npm_version =====
+10.9.3
+STATUS npm_version=0
+===== npm_ci =====
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+
+added 132 packages in 3s
+STATUS npm_ci=0
+===== install_pexpect =====
+Requirement already satisfied: pexpect in /usr/lib/python3/dist-packages (4.9.0)
+STATUS install_pexpect=0
+===== full_ci =====
+
+> cascade@0.4.0 ci
+> npm test && npm run check && npm run brand:check && npm run legal:check && npm run smoke
+
+
+> cascade@0.4.0 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: Cascade performs a real local model/tool loop without user API keys
+ok 1 - Cascade performs a real local model/tool loop without user API keys
+  ---
+  duration_ms: 58.646589
+  type: 'test'
+  ...
+# Subtest: configuration merges trusted project and environment overrides
+ok 2 - configuration merges trusted project and environment overrides
+  ---
+  duration_ms: 3.575756
+  type: 'test'
+  ...
+# Subtest: untrusted project configuration is ignored
+ok 3 - untrusted project configuration is ignored
+  ---
+  duration_ms: 1.862084
+  type: 'test'
+  ...
+# Subtest: example configuration validates and requires explicit Contributor opt-in
+ok 4 - example configuration validates and requires explicit Contributor opt-in
+  ---
+  duration_ms: 0.777813
+  type: 'test'
+  ...
+# Subtest: enabled programmatic workspace requires an explicit sandbox decision
+ok 5 - enabled programmatic workspace requires an explicit sandbox decision
+  ---
+  duration_ms: 0.97653
+  type: 'test'
+  ...
+# Subtest: expert runner parses Pi JSON event stream and exact model args
+ok 6 - expert runner parses Pi JSON event stream and exact model args
+  ---
+  duration_ms: 48.452739
+  type: 'test'
+  ...
+# Subtest: expert JSON parser falls back safely
+ok 7 - expert JSON parser falls back safely
+  ---
+  duration_ms: 0.523543
+  type: 'test'
+  ...
+# Subtest: explicit takeover retains configured edit and write tools
+ok 8 - explicit takeover retains configured edit and write tools
+  ---
+  duration_ms: 43.949682
+  type: 'test'
+  ...
+# Subtest: expert runner consumes a final JSON event without trailing newline
+ok 9 - expert runner consumes a final JSON event without trailing newline
+  ---
+  duration_ms: 39.444351
+  type: 'test'
+  ...
+# Subtest: dual extension runs a fully configured isolated expert consultation
+ok 10 - dual extension runs a fully configured isolated expert consultation
+  ---
+  duration_ms: 68.611708
+  type: 'test'
+  ...
+# Subtest: contributor input is redacted, images are denied, and protected paths are blocked
+ok 11 - contributor input is redacted, images are denied, and protected paths are blocked
+  ---
+  duration_ms: 7.951628
+  type: 'test'
+  ...
+# Subtest: session cost budget blocks later prompts after recorded worker usage
+ok 12 - session cost budget blocks later prompts after recorded worker usage
+  ---
+  duration_ms: 5.599422
+  type: 'test'
+  ...
+# Subtest: completion gate verifies a real changed Git worktree before accepting settlement
+ok 13 - completion gate verifies a real changed Git worktree before accepting settlement
+  ---
+  duration_ms: 318.765471
+  type: 'test'
+  ...
+# Subtest: a successful non-verifier command cannot bypass the completion gate
+ok 14 - a successful non-verifier command cannot bypass the completion gate
+  ---
+  duration_ms: 619.898085
+  type: 'test'
+  ...
+# Subtest: extension initializes single-model worker and records route evidence
+ok 15 - extension initializes single-model worker and records route evidence
+  ---
+  duration_ms: 22.177161
+  type: 'test'
+  ...
+# Subtest: harness candidates require evaluation, promote, and roll back
+ok 16 - harness candidates require evaluation, promote, and roll back
+  ---
+  duration_ms: 7.571079
+  type: 'test'
+  ...
+# Subtest: canary activation is process-local and never persists as promoted state
+ok 17 - canary activation is process-local and never persists as promoted state
+  ---
+  duration_ms: 4.586547
+  type: 'test'
+  ...
+# Subtest: evidence ledger persists redacted bounded handoff
+ok 18 - evidence ledger persists redacted bounded handoff
+  ---
+  duration_ms: 5.188557
+  type: 'test'
+  ...
+# Subtest: cost estimator uses per-million rates
+ok 19 - cost estimator uses per-million rates
+  ---
+  duration_ms: 0.430114
+  type: 'test'
+  ...
+# Subtest: Cascade owns an isolated application directory and ignores Pi resources
+ok 20 - Cascade owns an isolated application directory and ignores Pi resources
+  ---
+  duration_ms: 3.201456
+  type: 'test'
+  ...
+# Subtest: global compaction limits are persisted in Cascade settings
+ok 21 - global compaction limits are persisted in Cascade settings
+  ---
+  duration_ms: 88.166333
+  type: 'test'
+  ...
+# Subtest: unrestricted Cascade roles preserve native tools and add only Cascade controls
+ok 22 - unrestricted Cascade roles preserve native tools and add only Cascade controls
+  ---
+  duration_ms: 1.471059
+  type: 'test'
+  ...
+# Subtest: explicit role restriction is reversible
+ok 23 - explicit role restriction is reversible
+  ---
+  duration_ms: 0.357875
+  type: 'test'
+  ...
+# Subtest: model selection modes distinguish native from configured roles
+ok 24 - model selection modes distinguish native from configured roles
+  ---
+  duration_ms: 0.174721
+  type: 'test'
+  ...
+# Subtest: automatic runtime resolves the packaged Pi dependency path
+ok 25 - automatic runtime resolves the packaged Pi dependency path
+  ---
+  duration_ms: 3.220836
+  type: 'test'
+  ...
+# Subtest: runtime health check executes the resolved CLI
+ok 26 - runtime health check executes the resolved CLI
+  ---
+  duration_ms: 25.968299
+  type: 'test'
+  ...
+# Subtest: explicit runtime binary remains supported
+ok 27 - explicit runtime binary remains supported
+  ---
+  duration_ms: 0.610302
+  type: 'test'
+  ...
+# Subtest: JavaScript entrypoints are launched through Node on every platform
+ok 28 - JavaScript entrypoints are launched through Node on every platform
+  ---
+  duration_ms: 0.290184
+  type: 'test'
+  ...
+# Subtest: contributor models require public explicit consent
+ok 29 - contributor models require public explicit consent
+  ---
+  duration_ms: 1.163099
+  type: 'test'
+  ...
+# Subtest: private models are not blocked by contributor policy
+ok 30 - private models are not blocked by contributor policy
+  ---
+  duration_ms: 0.294891
+  type: 'test'
+  ...
+# Subtest: denied paths and credential dumps are blocked
+ok 31 - denied paths and credential dumps are blocked
+  ---
+  duration_ms: 1.589016
+  type: 'test'
+  ...
+# Subtest: secret redaction preserves labels and removes values
+ok 32 - secret redaction preserves labels and removes values
+  ---
+  duration_ms: 0.770051
+  type: 'test'
+  ...
+# Subtest: glob conversion supports recursive patterns
+ok 33 - glob conversion supports recursive patterns
+  ---
+  duration_ms: 0.292307
+  type: 'test'
+  ...
+# Subtest: model capability probe validates provider stream and tool execution
+ok 34 - model capability probe validates provider stream and tool execution
+  ---
+  duration_ms: 38.523579
+  type: 'test'
+  ...
+# Subtest: model capability probe consumes a final event without trailing newline
+ok 35 - model capability probe consumes a final event without trailing newline
+  ---
+  duration_ms: 40.950473
+  type: 'test'
+  ...
+# Subtest: harness replay compares baseline and canary with direct absolute task paths
+ok 36 - harness replay compares baseline and canary with direct absolute task paths
+  ---
+  duration_ms: 188.458004
+  type: 'test'
+  ...
+# Subtest: repeated verifier failures escalate trajectory
+ok 37 - repeated verifier failures escalate trajectory
+  ---
+  duration_ms: 2.707448
+  type: 'test'
+  ...
+# Subtest: progress decays escalation score
+ok 38 - progress decays escalation score
+  ---
+  duration_ms: 0.389051
+  type: 'test'
+  ...
+# Subtest: single mode never admits expert
+ok 39 - single mode never admits expert
+  ---
+  duration_ms: 0.378465
+  type: 'test'
+  ...
+# Subtest: dual mode automatically admits an expert only after the consult threshold
+ok 40 - dual mode automatically admits an expert only after the consult threshold
+  ---
+  duration_ms: 0.385266
+  type: 'test'
+  ...
+# Subtest: ledger resumes Pi session totals and user goal without resetting budgets
+ok 41 - ledger resumes Pi session totals and user goal without resetting budgets
+  ---
+  duration_ms: 3.252312
+  type: 'test'
+  ...
+# Subtest: router restores trajectory and enforces the total session budget
+ok 42 - router restores trajectory and enforces the total session budget
+  ---
+  duration_ms: 1.084661
+  type: 'test'
+  ...
+# Subtest: ledger restores complete cost totals even when history exceeds its memory window
+ok 43 - ledger restores complete cost totals even when history exceeds its memory window
+  ---
+  duration_ms: 9.43134
+  type: 'test'
+  ...
+# Subtest: real Cascade TUI is branded and isolated from Pi state and extensions
+ok 44 - real Cascade TUI is branded and isolated from Pi state and extensions
+  ---
+  duration_ms: 4416.440488
+  type: 'test'
+  ...
+# Subtest: setup persists a native worker and configured expert without secrets
+ok 45 - setup persists a native worker and configured expert without secrets
+  ---
+  duration_ms: 17.307505
+  type: 'test'
+  ...
+# Subtest: provider choices are taken from the active Cascade model registry
+ok 46 - provider choices are taken from the active Cascade model registry
+  ---
+  duration_ms: 1.107946
+  type: 'test'
+  ...
+# Subtest: authentication preparation uses the engine's native login command
+ok 47 - authentication preparation uses the engine's native login command
+  ---
+  duration_ms: 0.462541
+  type: 'test'
+  ...
+# Subtest: self update installs current GitHub main without uninstalling
+ok 48 - self update installs current GitHub main without uninstalling
+  ---
+  duration_ms: 3.075308
+  type: 'test'
+  ...
+# Subtest: semantic versions compare predictably
+ok 49 - semantic versions compare predictably
+  ---
+  duration_ms: 0.466788
+  type: 'test'
+  ...
+# Subtest: dry-run update never spawns npm or reaches the network
+ok 50 - dry-run update never spawns npm or reaches the network
+  ---
+  duration_ms: 0.442411
+  type: 'test'
+  ...
+# Subtest: self update refuses to downgrade from an older main branch
+ok 51 - self update refuses to downgrade from an older main branch
+  ---
+  duration_ms: 0.60858
+  type: 'test'
+  ...
+# Subtest: self update skips an already current installation
+ok 52 - self update skips an already current installation
+  ---
+  duration_ms: 0.458014
+  type: 'test'
+  ...
+# Subtest: real update path reports npm failures
+ok 53 - real update path reports npm failures
+  ---
+  duration_ms: 0.718784
+  type: 'test'
+  ...
+# Subtest: CLI update dry-run prints the exact in-place npm command
+ok 54 - CLI update dry-run prints the exact in-place npm command
+  ---
+  duration_ms: 61.635268
+  type: 'test'
+  ...
+# Subtest: verification discovers package scripts and executes configured checks
+ok 55 - verification discovers package scripts and executes configured checks
+  ---
+  duration_ms: 369.676536
+  type: 'test'
+  ...
+# Subtest: only discovered or configured verifier commands count as trusted proof
+ok 56 - only discovered or configured verifier commands count as trusted proof
+  ---
+  duration_ms: 0.552646
+  type: 'test'
+  ...
+# Subtest: programmatic workspace refuses implicit unsandboxed execution
+ok 57 - programmatic workspace refuses implicit unsandboxed execution
+  ---
+  duration_ms: 3.709646
+  type: 'test'
+  ...
+# Subtest: programmatic workspace persists bounded JSON state when explicitly allowed
+ok 58 - programmatic workspace persists bounded JSON state when explicitly allowed
+  ---
+  duration_ms: 146.332705
+  type: 'test'
+  ...
+# Subtest: programmatic workspace reports timeouts explicitly
+ok 59 - programmatic workspace reports timeouts explicitly
+  ---
+  duration_ms: 55.49615
+  type: 'test'
+  ...
+# Subtest: wrapper injects extension and fully configurable worker
+ok 60 - wrapper injects extension and fully configurable worker
+  ---
+  duration_ms: 104.147215
+  type: 'test'
+  ...
+# Subtest: wrapper launches the packaged runtime without a global pi command
+ok 61 - wrapper launches the packaged runtime without a global pi command
+  ---
+  duration_ms: 75.786349
+  type: 'test'
+  ...
+1..61
+# tests 61
+# suites 0
+# pass 61
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5713.374937
+
+> cascade@0.4.0 check
+> node scripts/check.mjs
+
+Static checks passed for 52 JavaScript modules.
+
+> cascade@0.4.0 brand:check
+> node scripts/check-brand.mjs
+
+Cascade branding check passed.
+
+> cascade@0.4.0 legal:check
+> node scripts/check-legal.mjs
+
+Legal and attribution checks passed.
+
+> cascade@0.4.0 smoke
+> node scripts/package-smoke.mjs
+
+
+added 2 packages in 301ms
+
+added 2 packages in 292ms
+
+added 2 packages in 616ms
+Standalone package, isolation, compaction, update, and Git-source smoke tests passed: /tmp/cascade-smoke-fJJx5F/pack/cascade-0.4.0.tgz
+STATUS full_ci=0

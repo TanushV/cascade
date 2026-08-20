@@ -68,6 +68,14 @@ send(b"/cascade-mode dual\r")
 drain(1.0)
 send(b"/cascade\r")
 drain(0.8)
+# Open Cascade expert configuration. This must be Pi's native searchable model
+# selector, not Cascade's old provider/model select lists.
+send(b"/cascade-expert\r")
+drain(1.0)
+send(b"zzzz-native-search-probe")
+drain(0.7)
+send(b"\x1b")  # escape cancels the model picker
+drain(0.5)
 send(b"\x04")
 drain(0.2)
 send(b"\x04")
@@ -96,7 +104,9 @@ report = {
     "hasClearSingleStatus": "Single · Worker:" in plain,
     "hasClearDualStatus": "Dual · Active Worker:" in plain and "Expert: on-demand" in plain,
     "hasCrypticStatus": bool(re.search(r"worker · (?:single|dual) · route ", plain)),
-    "tail": plain[-7000:]
+    "hasNativePicker": "Only showing models from configured providers" in plain,
+    "hasNativeSearchProbe": "zzzz-native-search-probe" in plain,
+    "tail": plain[-9000:]
 }
 if (
     not report["hasCascadeBrand"]
@@ -106,6 +116,8 @@ if (
     or not report["hasClearSingleStatus"]
     or not report["hasClearDualStatus"]
     or report["hasCrypticStatus"]
+    or not report["hasNativePicker"]
+    or not report["hasNativeSearchProbe"]
 ):
     print(json.dumps(report))
     raise SystemExit(1)

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { ModelSelectorComponent, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { getGlobalConfigPath, getProjectConfigPath } from "./config.mjs";
 import { VALID_THINKING_LEVELS } from "./defaults.mjs";
 import { isContributorModel } from "./privacy.mjs";
@@ -14,7 +15,7 @@ export const SETUP_OPTIONS = Object.freeze({
   modeSingle: "Single model",
   modeDual: "Worker + on-demand expert",
   workerNative: "Use the current Cascade model (/model)",
-  workerFixed: "Choose a fixed worker model",
+  workerFixed: "Choose worker with Pi's searchable model picker",
   keepBudgets: "Keep current budgets",
   editBudgets: "Edit budgets"
 });
@@ -81,6 +82,63 @@ export function listRoleModelChoices(ctx, provider) {
   });
 }
 
+function modelRuntimeAdapter(ctx) {
+  return {
+    refresh(options) {
+      if (typeof ctx.modelRegistry?.refresh === "function") return ctx.modelRegistry.refresh(options);
+      return Promise.resolve({ aborted: false, errors: new Map() });
+    },
+    getAvailableSnapshot() {
+      return [...(ctx.modelRegistry?.getAvailable?.() || [])];
+    },
+    getModel(provider, id) {
+      return ctx.modelRegistry?.find?.(provider, id);
+    },
+    getError() {
+      return ctx.modelRegistry?.getError?.();
+    }
+  };
+}
+
+/**
+ * Use Pi's own ModelSelectorComponent so Cascade gets the same fuzzy search,
+ * provider availability, keyboard behavior, and catalog refresh as /model.
+ * Selecting a role model here does not change the active chat model.
+ */
+export async function pickModelWithNativeUi(ctx, current) {
+  if (!ctx?.hasUI || typeof ctx.ui?.custom !== "function") {
+    throw new Error("Model selection requires the interactive Cascade TUI");
+  }
+  const configured = current?.provider && current?.model
+    ? ctx.modelRegistry?.find?.(current.provider, current.model)
+    : undefined;
+  const currentModel = configured || ctx.model;
+  const settingsManager = SettingsManager.inMemory();
+  const runtime = modelRuntimeAdapter(ctx);
+
+  return ctx.ui.custom((tui, _theme, _keybindings, done) => {
+    const component = new ModelSelectorComponent(
+      tui,
+      currentModel,
+      settingsManager,
+      runtime,
+      [],
+      (model) => done(model),
+      () => done(null)
+    );
+    component.focused = true;
+    return {
+      render: (width) => component.render(width),
+      invalidate: () => component.invalidate(),
+      handleInput: (data) => {
+        component.handleInput(data);
+        tui.requestRender();
+      },
+      dispose: () => component.dispose?.()
+    };
+  });
+}
+
 async function chooseScope(ctx) {
   const selected = await ctx.ui.select("Cascade setup · Save settings", [
     SETUP_OPTIONS.scopeSession,
@@ -94,28 +152,20 @@ async function chooseScope(ctx) {
 }
 
 async function chooseModel(ctx, role, current) {
-  const providers = listProviderChoices(ctx);
-  if (!providers.length) {
-    ctx.ui.notify("No models are available yet. Run /login or configure a provider first.", "warning");
-    return undefined;
-  }
-  const providerLabel = await ctx.ui.select(`Cascade · ${role} provider`, providers.map((value) => value.label));
-  const provider = providers.find((value) => value.label === providerLabel)?.provider;
-  if (!provider) return undefined;
-  const choices = listRoleModelChoices(ctx, provider);
-  const modelLabel = await ctx.ui.select(`Cascade · ${role} model`, choices.map((value) => value.label));
-  const selected = choices.find((value) => value.label === modelLabel);
-  if (!selected) return undefined;
+  const selectedModel = await pickModelWithNativeUi(ctx, current);
+  if (!selectedModel) return undefined;
+  const provider = selectedModel.provider;
+  const available = readyKeys(ctx).has(modelKey(selectedModel));
   return {
     provider,
-    ready: selected.ready,
+    ready: available,
     profile: {
       ...deepClone(current || {}),
       selectionMode: "configured",
       thinkingMode: "configured",
       restrictTools: Boolean(current?.restrictTools),
-      provider: selected.model.provider,
-      model: modelId(selected.model)
+      provider,
+      model: modelId(selectedModel)
     }
   };
 }

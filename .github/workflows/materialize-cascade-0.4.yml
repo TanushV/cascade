@@ -29,11 +29,12 @@ jobs:
         run: |
           set -euo pipefail
           cat .publish/source-*.b64 | base64 --decode > "$RUNNER_TEMP/cascade-source.tar.gz"
-          echo "b20cfb024b25d32044acd6f93bb9973c792f1a3845fdef4f1ada3eaf857f6ed5  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
+          echo "5b8f78dde762b54bd547d2d0e8ac1c2aa8b9a52bbcd261426f4bc91cc9500bb2  $RUNNER_TEMP/cascade-source.tar.gz" | sha256sum --check --strict
           mkdir -p "$RUNNER_TEMP/cascade-source"
           tar -xzf "$RUNNER_TEMP/cascade-source.tar.gz" -C "$RUNNER_TEMP/cascade-source"
           rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
           npm ci --ignore-scripts --no-audit --no-fund
+          python3 -m pip install --user pexpect
           npm run ci
           git config user.name "TanushV"
           git config user.email "87838540+TanushV@users.noreply.github.com"

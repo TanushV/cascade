@@ -1,0 +1,32 @@
+name: Tag Cascade 0.4
+
+on:
+  push:
+    branches: [main]
+    paths: [.release-0.4]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify and tag exact main commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const p=require("./package.json"); if (p.version !== "0.4.0") process.exit(1)'
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run ci
+          git config user.name 'TanushV'
+          git config user.email '87838540+TanushV@users.noreply.github.com'
+          if git rev-parse v0.4.0 >/dev/null 2>&1; then
+            test "$(git rev-list -n1 v0.4.0)" = "$GITHUB_SHA"
+          else
+            git tag -a v0.4.0 -m 'Cascade 0.4.0'
+            git push origin v0.4.0
+          fi

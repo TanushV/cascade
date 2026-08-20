@@ -1,0 +1,28 @@
+name: Export source temp
+
+on:
+  push:
+    branches:
+      - agent/unify-model-ux-context-limit
+    paths:
+      - .github/workflows/export-source-temp.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Archive source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git -czf "$RUNNER_TEMP/cascade-source.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cascade-source
+          path: ${{ runner.temp }}/cascade-source.tar.gz
+          if-no-files-found: error

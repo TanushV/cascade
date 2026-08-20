@@ -81,3 +81,23 @@ Standalone installation repair.
 - The parent worker, expert subprocess, provider probe, and doctor resolve the runtime from Cascade's own installation instead of requiring a global `pi` command.
 - `piBinary` now defaults to `auto`; `--pi-bin` remains an advanced override.
 - Added `cascade --version`, `cascade runtime`, and `cascade self-test`.
+- Added clean local and isolated global install tests where only the Cascade tarball is installed.
+- Corrected installation guidance so the tarball path is resolved from its actual download directory.
+
+## 0.1.0 - 2026-08-18
+
+Initial end-to-end Cascade implementation.
+
+### Added
+
+- Configurable single-model and two-model execution through one runtime path.
+- Independently configurable worker and expert provider, model, reasoning level, tools, instructions, timeout, and expert output budget.
+- OpenRouter support through Pi's built-in provider and OAuth/API-key handling.
+- Meta Model API provider profile with Muse Spark 1.2 Standard and Contributor entries.
+- Isolated expert consultations, investigations, reviews, and explicitly authorized takeovers.
+- Typed append-only evidence ledger, compact handoffs, trajectory-conditioned routing, session resumption, and cost accounting.
+- Contributor endpoint consent, repository classification, sensitive-path blocking, secret redaction, and image denial by default.
+- Repository verification discovery, completion gates, and real Git worktree tracking.
+- Versioned scoped harness state, inactive proposals, process-local canaries, replay evaluation, promotion, rollback, and retirement controls.
+- Optional bounded programmatic Python workspace requiring an external sandbox or explicit unsandboxed acknowledgement.
+- Pi wrapper CLI, model probes, doctor, evaluation runner, source-tree overlay, deterministic fork bootstrap, package smoke test, and local release builder.

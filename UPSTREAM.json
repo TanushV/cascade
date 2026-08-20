@@ -4,7 +4,7 @@
   "codingAgentPackage": "@earendil-works/pi-coding-agent",
   "codingAgentVersion": "0.84.2",
   "integration": "Independent Cascade application using Pi packages as an MIT-licensed engine dependency",
-  "cascadeVersion": "0.4.0",
+  "cascadeVersion": "0.4.1",
   "preparedOn": "2026-08-19",
   "runtimeDelivery": "Bundled npm dependency with isolated Cascade state; no separate Pi installation required"
 }

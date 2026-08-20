@@ -1,0 +1,89 @@
+name: Finalize verified Cascade 0.4 source
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/cascade-0.4-finalize'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/cascade-0.4-finalize
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+      - name: Reconstruct, validate, and commit the isolated application
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f .publish/READY ]]; then
+            echo 'Verified source is already materialized.'
+            exit 0
+          fi
+
+          EXPECTED='5b8f78dde762b54bd547d2d0e8ac1c2aa8b9a52bbcd261426f4bc91cc9500bb2'
+          DEST="$RUNNER_TEMP/cascade-source.tar.gz"
+          shopt -s nullglob
+
+          try_candidate() {
+            local label="$1"
+            shift
+            local files=("$@")
+            [[ ${#files[@]} -gt 0 ]] || return 1
+            local candidate="$RUNNER_TEMP/${label}.tar.gz"
+            cat "${files[@]}" | base64 --decode > "$candidate"
+            local actual
+            actual="$(sha256sum "$candidate" | awk '{print $1}')"
+            if [[ "$actual" == "$EXPECTED" ]]; then
+              mv "$candidate" "$DEST"
+              echo "Matched verified payload: $label"
+              return 0
+            fi
+            rm -f "$candidate"
+            return 1
+          }
+
+          source_chunks=(.publish/source-*.b64)
+          current_chunks=(.publish/current-*.b64)
+          new_chunks=(.publish/new-*.b64)
+          all_chunks=(.publish/*.b64)
+
+          try_candidate source "${source_chunks[@]}" || \
+          try_candidate current "${current_chunks[@]}" || \
+          try_candidate new "${new_chunks[@]}" || \
+          try_candidate current-new "${current_chunks[@]}" "${new_chunks[@]}" || \
+          try_candidate all "${all_chunks[@]}" || {
+            echo 'No staging combination matched the verified source checksum.' >&2
+            exit 1
+          }
+
+          echo "$EXPECTED  $DEST" | sha256sum --check --strict
+          tar -tzf "$DEST" >/dev/null
+          mkdir -p "$RUNNER_TEMP/cascade-source"
+          tar -xzf "$DEST" -C "$RUNNER_TEMP/cascade-source"
+          test "$(node -p "require('$RUNNER_TEMP/cascade-source/package.json').version")" = '0.4.0'
+
+          rsync -a --delete --exclude=.git "$RUNNER_TEMP/cascade-source/" ./
+          npm ci --ignore-scripts --no-audit --no-fund
+          python3 -m pip install --user pexpect
+          npm run ci
+
+          git config user.name 'TanushV'
+          git config user.email '87838540+TanushV@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Ship Cascade 0.4 as an isolated application'
+            git push origin HEAD:agent/cascade-0.4-finalize
+          fi

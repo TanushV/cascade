@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 - 2026-08-19
+
+### Changed
+
+- Worker and expert model selection now reuse Pi's native searchable model selector instead of Cascade maintaining a competing provider/model list.
+- The persistent footer now describes dual-mode ownership in plain language: active worker or expert, worker pause state, and whether the expert is on-demand, recommended, or ready for consultation.
+- Detailed routing scores, costs, and evidence remain available through `/cascade` instead of occupying the persistent status bar.
+
+### Fixed
+
+- Restored fuzzy model search, catalog refresh, keyboard behavior, and provider availability indicators when choosing Cascade role models.
+- Removed the ambiguous `worker · dual · route ... · expert ...` telemetry from the visible footer.
+
 ## 0.4.0 - 2026-08-19
 
 ### Changed

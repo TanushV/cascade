@@ -1,4 +1,4 @@
-export const PACKAGE_VERSION = "0.4.0";
+export const PACKAGE_VERSION = "0.4.1";
 export const CONFIG_SCHEMA_VERSION = 1;
 
 export const DEFAULT_CONFIG = Object.freeze({

@@ -79,7 +79,7 @@ test("CLI update dry-run prints the exact in-place npm command", () => {
     encoding: "utf8"
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /npm ["\']?install["\']? ["\']?-g["\']?/);
+  assert.match(result.stdout, /npm(?:\.cmd)? ["\']?install["\']? ["\']?-g["\']?/);
   assert.match(result.stdout, /TanushV\/cascade/);
   assert.doesNotMatch(result.stdout, /Cascade updated/);
 });
